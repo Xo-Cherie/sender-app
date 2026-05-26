@@ -46,6 +46,13 @@ export default function FriendsScreen() {
     else { setSearchTerm(''); setShowAddModal(false); }
   };
 
+  const openInviteModal = () => {
+    setAddMode('invite');
+    setError('');
+    setSuccessMsg('');
+    setShowAddModal(true);
+  };
+
   const handleEmailInvite = async () => {
     if (!emailInvite.trim()) return;
     setSendingEmailInvite(true);
@@ -121,8 +128,16 @@ export default function FriendsScreen() {
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
         <View style={styles.header}>
-          <Text style={styles.title}>Friends</Text>
-          <Text style={styles.subtitle}>{acceptedFriends.length} {acceptedFriends.length === 1 ? 'friend' : 'friends'}</Text>
+          <View style={styles.headerTop}>
+            <View>
+              <Text style={styles.title}>Friends</Text>
+              <Text style={styles.subtitle}>{acceptedFriends.length} {acceptedFriends.length === 1 ? 'friend' : 'friends'}</Text>
+            </View>
+            <Pressable style={styles.headerInviteButton} onPress={openInviteModal}>
+              <MaterialIcons name="person-add-alt-1" size={16} color={theme.colors.primary} />
+              <Text style={styles.headerInviteText}>Invite</Text>
+            </Pressable>
+          </View>
         </View>
 
         {/* Friend Requests */}
@@ -166,6 +181,12 @@ export default function FriendsScreen() {
               </View>
               <Text style={styles.emptyTitle}>No friends yet</Text>
               <Text style={styles.emptySubtext}>Add friends to send them cards</Text>
+              <Button
+                title="Invite Friends"
+                onPress={openInviteModal}
+                variant="outline"
+                style={styles.emptyInviteButton}
+              />
             </View>
           ) : (
             acceptedFriends.map(friend => (
@@ -222,7 +243,7 @@ export default function FriendsScreen() {
           <View style={styles.modalContent}>
             <View style={styles.modalHandle} />
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Add Friend</Text>
+              <Text style={styles.modalTitle}>{addMode === 'invite' ? 'Invite Friends' : 'Add Friend'}</Text>
               <Pressable onPress={handleCloseModal} style={styles.closeBtn}>
                 <MaterialIcons name="close" size={20} color={theme.colors.charcoal} />
               </Pressable>
@@ -387,6 +408,19 @@ const styles = StyleSheet.create({
     paddingTop: theme.spacing.sm,
     paddingBottom: theme.spacing.md,
   },
+  headerTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: theme.spacing.md },
+  headerInviteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderColor: theme.colors.primary,
+    borderRadius: theme.borderRadius.full,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: theme.colors.white,
+  },
+  headerInviteText: { fontSize: 13, color: theme.colors.primary, fontWeight: '700' },
   title: { fontSize: 30, fontWeight: '700', color: theme.colors.dark, fontFamily: theme.fonts.serif, letterSpacing: -0.5 },
   subtitle: { fontSize: 14, color: theme.colors.mediumGray, marginTop: 2, fontWeight: '500' },
   section: { paddingHorizontal: theme.spacing.lg, marginBottom: theme.spacing.lg },
@@ -438,6 +472,7 @@ const styles = StyleSheet.create({
   emptyIcon: { width: 64, height: 64, borderRadius: 32, backgroundColor: theme.colors.primaryLight, alignItems: 'center', justifyContent: 'center', marginBottom: theme.spacing.md },
   emptyTitle: { fontSize: 17, fontWeight: '700', color: theme.colors.dark, marginBottom: 4 },
   emptySubtext: { fontSize: 14, color: theme.colors.mediumGray, textAlign: 'center' },
+  emptyInviteButton: { marginTop: theme.spacing.md, minWidth: 180 },
   fab: {
     position: 'absolute', bottom: 100, right: theme.spacing.lg,
     width: 56, height: 56, borderRadius: 28,
