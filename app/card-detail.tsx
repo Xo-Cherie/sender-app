@@ -188,26 +188,40 @@ export default function CardDetailScreen() {
   }
 
   // Resolve template reference to actual image
-  function resolveImage(frontDesignUrl: string): string | ReturnType<typeof require> {
-    if (frontDesignUrl && frontDesignUrl.startsWith('template:')) {
+  function resolveImage(frontDesignUrl: unknown): string | ReturnType<typeof require> {
+    if (typeof frontDesignUrl === 'number') {
+      return frontDesignUrl as ReturnType<typeof require>;
+    }
+
+    if (typeof frontDesignUrl !== 'string') {
+      return '';
+    }
+
+    if (frontDesignUrl.startsWith('template:')) {
       const templateId = frontDesignUrl.replace('template:', '');
       const template = cardTemplates.find(t => t.id === templateId);
       return template ? template.frontImage : frontDesignUrl;
     }
+
     return frontDesignUrl;
   }
 
   // Ensure required fields have values
-  const resolvedFrontImage = resolveImage(card.frontImage as string || '');
+  const resolvedFrontImage = resolveImage(card.frontImage);
   const displayFrontImage = resolvedFrontImage || 'https://images.unsplash.com/photo-1513885535751-8b9238bd34c2?w=800';
   const displayMessage = card.personalMessage || 'No message';
   const displaySenderName = card.senderName || 'Unknown';
+  const displayRecipientNames = Array.isArray(card.recipientNames) && card.recipientNames.length > 0
+    ? card.recipientNames
+    : ['Recipient'];
   const displayRecipientName = isSentView 
-    ? (card.recipientNames && card.recipientNames[0] ? card.recipientNames[0] : 'Recipient') 
+    ? displayRecipientNames[0]
     : 'You';
 
   // Get title from template
-  const templateId = (card.frontImage as string)?.replace('template:', '') || card.templateId;
+  const templateId = typeof card.frontImage === 'string'
+    ? card.frontImage.replace('template:', '')
+    : card.templateId;
   const cardTemplate = cardTemplates.find(t => t.id === templateId);
   const cardTitle = cardTemplate?.title;
 
@@ -274,7 +288,7 @@ export default function CardDetailScreen() {
         <View style={styles.info}>
           <Text style={styles.from}>
             {isSentView 
-              ? `To: ${card.recipientNames.join(', ')}` 
+              ? `To: ${displayRecipientNames.join(', ')}`
               : `From ${card.senderName}`}
           </Text>
           <Text style={styles.date}>
