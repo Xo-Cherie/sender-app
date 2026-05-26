@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -34,6 +34,7 @@ export default function CreateCardScreen() {
   const { friends } = useFriends();
   const { sendCard } = useCards();
   const { user } = useAuth();
+  const redirectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   const [step, setStep] = useState<Step>('category');
   const [selectedCategory, setSelectedCategory] = useState<CardCategory | null>(null);
@@ -45,6 +46,7 @@ export default function CreateCardScreen() {
   const [senderDisplayName, setSenderDisplayName] = useState('');
   const [personalMessage, setPersonalMessage] = useState('');
   const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
   const [mediaAttachments, setMediaAttachments] = useState<MediaAttachment[]>([]);
   const [gift, setGift] = useState<Gift | null>(null);
   const [giftAmount, setGiftAmount] = useState('');
@@ -53,6 +55,18 @@ export default function CreateCardScreen() {
   const selectedTemplate_data = cardTemplates.find(t => t.id === selectedTemplate);
 
   const categories = Object.entries(categoryLabels);
+
+  useEffect(() => {
+    return () => {
+      if (redirectTimerRef.current) {
+        clearTimeout(redirectTimerRef.current);
+      }
+    };
+  }, []);
+
+  const goToOutbox = () => {
+    router.replace('/(tabs)/outbox');
+  };
 
   const handleNext = () => {
     const steps: Step[] = ['category', 'template', 'recipients', 'message', 'media', 'gift', 'preview'];
@@ -116,7 +130,8 @@ export default function CreateCardScreen() {
       };
 
       await sendCard(card);
-      router.replace('/(tabs)/outbox');
+      setSent(true);
+      redirectTimerRef.current = setTimeout(goToOutbox, 1200);
     } catch (error) {
       console.error('Failed to send card:', error);
       alert('Failed to send card. Please try again.');
@@ -139,6 +154,23 @@ export default function CreateCardScreen() {
         return true;
     }
   };
+
+  if (sent) {
+    return (
+      <SafeAreaView style={styles.container} edges={['bottom']}>
+        <View style={styles.sentContainer}>
+          <View style={styles.sentIcon}>
+            <MaterialIcons name="check" size={40} color={theme.colors.white} />
+          </View>
+          <Text style={styles.sentTitle}>Sent</Text>
+          <Text style={styles.sentMessage}>
+            Your card was sent successfully. Taking you to your Outbox...
+          </Text>
+          <Button title="Go to Outbox" onPress={goToOutbox} size="large" style={styles.sentButton} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
@@ -740,5 +772,38 @@ const styles = StyleSheet.create({
     color: theme.colors.dark,
     marginBottom: theme.spacing.lg,
     fontFamily: theme.fonts.serif,
+  },
+  sentContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: theme.spacing.xl,
+  },
+  sentIcon: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: theme.colors.success,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: theme.spacing.lg,
+    ...theme.shadows.elevated,
+  },
+  sentTitle: {
+    fontSize: 34,
+    fontWeight: '700',
+    color: theme.colors.dark,
+    fontFamily: theme.fonts.serif,
+    marginBottom: theme.spacing.sm,
+  },
+  sentMessage: {
+    fontSize: 16,
+    color: theme.colors.mediumGray,
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: theme.spacing.xl,
+  },
+  sentButton: {
+    minWidth: 220,
   },
 });

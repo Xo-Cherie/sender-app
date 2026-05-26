@@ -43,6 +43,18 @@ function formatProfileName(profile?: ProfileRow): string {
   return fullName || profile.email || 'Unknown';
 }
 
+function normalizeStringArray(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
+  }
+
+  if (typeof value === 'string' && value.trim().length > 0) {
+    return [value];
+  }
+
+  return [];
+}
+
 export function useCards() {
   const { user } = useAuth();
   const [sentCards, setSentCards] = useState<Card[]>([]);
@@ -155,11 +167,13 @@ export function useCards() {
         const dbRecipientIds = recipients.map((rc: any) => rc.recipient_id);
         const dbRecipientNames = recipients.map((rc: any) => formatProfileName(recipientProfileById.get(rc.recipient_id)));
         const storedRecipientInfo = c.recipient_info || {};
-        const finalRecipientNames = (storedRecipientInfo.names && storedRecipientInfo.names.length > 0)
-          ? storedRecipientInfo.names
+        const storedRecipientNames = normalizeStringArray(storedRecipientInfo.names);
+        const storedRecipientIds = normalizeStringArray(storedRecipientInfo.ids);
+        const finalRecipientNames = storedRecipientNames.length > 0
+          ? storedRecipientNames
           : (dbRecipientNames.length > 0 ? dbRecipientNames : ['Unknown Recipient']);
-        const finalRecipientIds = (storedRecipientInfo.ids && storedRecipientInfo.ids.length > 0)
-          ? storedRecipientInfo.ids
+        const finalRecipientIds = storedRecipientIds.length > 0
+          ? storedRecipientIds
           : dbRecipientIds;
         const deliveryStatuses: RecipientDeliveryStatus[] = recipients.map((rc: any) => ({
           recipientId: rc.recipient_id,
@@ -204,8 +218,8 @@ export function useCards() {
           id: c.id,
           senderId: c.sender_id,
           senderName: user.name || user.email,
-          recipientIds: storedRecipientInfo.ids || [],
-          recipientNames: storedRecipientInfo.names || [],
+          recipientIds: normalizeStringArray(storedRecipientInfo.ids),
+          recipientNames: normalizeStringArray(storedRecipientInfo.names),
           category: resolveCardCategory(c.design_template),
           templateId: c.design_template || 'bday-1',
           frontImage: resolveCardImage(c.front_design_url, c.design_template),

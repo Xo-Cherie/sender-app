@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, Modal, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, Modal, ActivityIndicator, Linking, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { theme } from '@/constants/theme';
@@ -8,13 +8,22 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Image } from 'expo-image';
 
+const APP_INVITE_URL = 'https://www.cheriecard.com';
+
+function buildInviteMessage() {
+  return `Join me on Xo Cherie so we can send and save digital greeting cards together: ${APP_INVITE_URL}`;
+}
+
 export default function FriendsScreen() {
   const { friends, searchResults, searching, searchUsers, addFriend, addFriendByEmail, acceptFriendRequest, removeFriend } = useFriends();
   const [showAddModal, setShowAddModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [emailInvite, setEmailInvite] = useState('');
-  const [addMode, setAddMode] = useState<'search' | 'email'>('search');
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [invitePhone, setInvitePhone] = useState('');
+  const [addMode, setAddMode] = useState<'search' | 'email' | 'invite'>('search');
   const [sendingEmailInvite, setSendingEmailInvite] = useState(false);
+  const [sendingInvite, setSendingInvite] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
@@ -52,10 +61,56 @@ export default function FriendsScreen() {
     }
   };
 
+  const openInviteUrl = async (url: string, successMessage: string) => {
+    setSendingInvite(true);
+    setError('');
+    setSuccessMsg('');
+    try {
+      const canOpen = Platform.OS === 'web' || await Linking.canOpenURL(url);
+      if (!canOpen) {
+        setError('No app is available to send this invite.');
+        return;
+      }
+
+      await Linking.openURL(url);
+      setSuccessMsg(successMessage);
+    } catch (inviteError: any) {
+      setError(inviteError.message || 'Could not open invite app');
+    } finally {
+      setSendingInvite(false);
+    }
+  };
+
+  const handleSendEmailInvite = async () => {
+    const email = inviteEmail.trim();
+    if (!email) {
+      setError('Email address is required');
+      return;
+    }
+
+    const subject = encodeURIComponent('Join me on Xo Cherie');
+    const body = encodeURIComponent(buildInviteMessage());
+    await openInviteUrl(`mailto:${encodeURIComponent(email)}?subject=${subject}&body=${body}`, 'Email invite opened.');
+  };
+
+  const handleSendTextInvite = async () => {
+    const phone = invitePhone.trim().replace(/\s+/g, '');
+    if (!phone) {
+      setError('Phone number is required');
+      return;
+    }
+
+    const separator = Platform.OS === 'ios' ? '&' : '?';
+    const body = encodeURIComponent(buildInviteMessage());
+    await openInviteUrl(`sms:${phone}${separator}body=${body}`, 'Text invite opened.');
+  };
+
   const handleCloseModal = () => {
     setShowAddModal(false);
     setSearchTerm('');
     setEmailInvite('');
+    setInviteEmail('');
+    setInvitePhone('');
     setError('');
     setSuccessMsg('');
     setAddMode('search');
@@ -175,19 +230,19 @@ export default function FriendsScreen() {
 
             {/* Mode Toggle */}
             <View style={styles.modeToggle}>
-              {(['search', 'email'] as const).map(mode => (
+              {(['search', 'email', 'invite'] as const).map(mode => (
                 <Pressable
                   key={mode}
                   style={[styles.modeTab, addMode === mode && styles.modeTabActive]}
                   onPress={() => { setAddMode(mode); setError(''); setSuccessMsg(''); }}
                 >
                   <MaterialIcons
-                    name={mode === 'search' ? 'search' : 'alternate-email'}
+                    name={mode === 'search' ? 'search' : mode === 'email' ? 'alternate-email' : 'person-add'}
                     size={15}
                     color={addMode === mode ? theme.colors.white : theme.colors.mediumGray}
                   />
                   <Text style={[styles.modeTabText, addMode === mode && styles.modeTabTextActive]}>
-                    {mode === 'search' ? 'Search' : 'By Email'}
+                    {mode === 'search' ? 'Search' : mode === 'email' ? 'Request' : 'Invite'}
                   </Text>
                 </Pressable>
               ))}
@@ -203,8 +258,18 @@ export default function FriendsScreen() {
                 ) : searchTerm.trim().length >= 3 && searchResults.length === 0 ? (
                   <View style={styles.centered}>
                     <Text style={styles.noResultsText}>No users found</Text>
-                    <Pressable onPress={() => { setAddMode('email'); setEmailInvite(searchTerm); setError(''); }}>
-                      <Text style={styles.switchLink}>Try sending by email instead</Text>
+                    <Pressable
+                      onPress={() => {
+                        setAddMode('invite');
+                        if (searchTerm.includes('@')) {
+                          setInviteEmail(searchTerm);
+                        } else {
+                          setInvitePhone(searchTerm);
+                        }
+                        setError('');
+                      }}
+                    >
+                      <Text style={styles.switchLink}>Invite them to sign up</Text>
                     </Pressable>
                   </View>
                 ) : searchResults.length > 0 ? (
@@ -238,7 +303,7 @@ export default function FriendsScreen() {
                   </View>
                 )}
               </>
-            ) : (
+            ) : addMode === 'email' ? (
               <View>
                 <Text style={styles.emailDesc}>Send a friend request to someone with a Xo Cherie account.</Text>
                 <Input name="invite-email" label="Email Address" placeholder="friend@example.com" value={emailInvite} onChangeText={t => { setEmailInvite(t); setError(''); setSuccessMsg(''); }} keyboardType="email-address" autoCapitalize="none" />
@@ -249,6 +314,54 @@ export default function FriendsScreen() {
                   </View>
                 ) : null}
                 <Button title={sendingEmailInvite ? 'Sending...' : 'Send Request'} onPress={handleEmailInvite} disabled={!emailInvite.trim() || sendingEmailInvite} />
+              </View>
+            ) : (
+              <View>
+                <Text style={styles.emailDesc}>
+                  Invite someone new to Xo Cherie. This opens your email or messages app with a signup link.
+                </Text>
+                <Input
+                  name="signup-invite-email"
+                  label="Email Invite"
+                  placeholder="friend@example.com"
+                  value={inviteEmail}
+                  onChangeText={t => { setInviteEmail(t); setError(''); setSuccessMsg(''); }}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+                <Button
+                  title={sendingInvite ? 'Opening...' : 'Send Email Invite'}
+                  onPress={handleSendEmailInvite}
+                  disabled={!inviteEmail.trim() || sendingInvite}
+                  leftIcon={<MaterialIcons name="mail-outline" size={18} color={theme.colors.white} />}
+                />
+                <View style={styles.inviteDivider}>
+                  <View style={styles.inviteDividerLine} />
+                  <Text style={styles.inviteDividerText}>or</Text>
+                  <View style={styles.inviteDividerLine} />
+                </View>
+                <Input
+                  name="signup-invite-phone"
+                  label="Text Invite"
+                  placeholder="+1 555 123 4567"
+                  value={invitePhone}
+                  onChangeText={t => { setInvitePhone(t); setError(''); setSuccessMsg(''); }}
+                  keyboardType="phone-pad"
+                />
+                <Button
+                  title={sendingInvite ? 'Opening...' : 'Send Text Invite'}
+                  onPress={handleSendTextInvite}
+                  disabled={!invitePhone.trim() || sendingInvite}
+                  variant="outline"
+                  leftIcon={<MaterialIcons name="sms" size={18} color={theme.colors.primary} />}
+                />
+                <Text style={styles.inviteLink}>Signup link: {APP_INVITE_URL}</Text>
+                {successMsg ? (
+                  <View style={styles.successRow}>
+                    <MaterialIcons name="check-circle" size={16} color={theme.colors.success} />
+                    <Text style={styles.successText}>{successMsg}</Text>
+                  </View>
+                ) : null}
               </View>
             )}
 
@@ -363,6 +476,10 @@ const styles = StyleSheet.create({
   addButton: { width: 36, height: 36, borderRadius: 18, backgroundColor: theme.colors.primary, alignItems: 'center', justifyContent: 'center' },
   alreadyText: { fontSize: 12, color: theme.colors.mediumGray, fontStyle: 'italic' },
   emailDesc: { fontSize: 14, color: theme.colors.mediumGray, lineHeight: 20, marginBottom: theme.spacing.md },
+  inviteDivider: { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: theme.spacing.md },
+  inviteDividerLine: { flex: 1, height: 1, backgroundColor: theme.colors.lightGray },
+  inviteDividerText: { fontSize: 12, color: theme.colors.mediumGray, fontWeight: '700', textTransform: 'uppercase' },
+  inviteLink: { fontSize: 12, color: theme.colors.mediumGray, marginTop: theme.spacing.sm, marginBottom: theme.spacing.sm },
   successRow: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#F0FFF4', padding: 12, borderRadius: theme.borderRadius.sm, marginBottom: theme.spacing.sm },
   successText: { flex: 1, fontSize: 13, color: theme.colors.success, fontWeight: '600' },
   errorRow: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: theme.colors.errorLight, padding: 12, borderRadius: theme.borderRadius.sm, marginTop: theme.spacing.sm },

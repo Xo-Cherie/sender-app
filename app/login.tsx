@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 
 type AuthScreen = 'signIn' | 'signUp' | 'verify';
+const VERIFICATION_CODE_LENGTH = 8;
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -64,8 +65,8 @@ export default function LoginScreen() {
 
   const handleVerify = async () => {
     setError('');
-    if (!verificationCode || verificationCode.length !== 6) {
-      setError('Please enter the 6-digit code');
+    if (!verificationCode || verificationCode.length !== VERIFICATION_CODE_LENGTH) {
+      setError(`Please enter the ${VERIFICATION_CODE_LENGTH}-digit code`);
       return;
     }
     setLoading(true);
@@ -122,7 +123,7 @@ export default function LoginScreen() {
                   </View>
                   <Text style={styles.cardTitle}>Check your email</Text>
                   <Text style={styles.cardSubtitle}>
-                    We sent a 6-digit code to{'\n'}
+                    We sent an {VERIFICATION_CODE_LENGTH}-digit code to{'\n'}
                     <Text style={{ color: theme.colors.dark, fontWeight: '600' }}>{email}</Text>
                   </Text>
                 </View>
@@ -130,11 +131,11 @@ export default function LoginScreen() {
                 <Input
                   name="otp"
                   label="Verification Code"
-                  placeholder="000000"
+                  placeholder={'0'.repeat(VERIFICATION_CODE_LENGTH)}
                   value={verificationCode}
                   onChangeText={setVerificationCode}
                   keyboardType="number-pad"
-                  maxLength={6}
+                  maxLength={VERIFICATION_CODE_LENGTH}
                   style={styles.otpInput}
                 />
 
