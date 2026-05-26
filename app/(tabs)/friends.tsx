@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, Modal, ActivityIndicator, Linking, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, Modal, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { theme } from '@/constants/theme';
@@ -7,12 +7,7 @@ import { useFriends } from '@/hooks/useFriends';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Image } from 'expo-image';
-
-const APP_INVITE_URL = 'https://www.cheriecard.com';
-
-function buildInviteMessage() {
-  return `Join me on Xo Cherie so we can send and save digital greeting cards together: ${APP_INVITE_URL}`;
-}
+import { supabase } from '@/lib/supabase';
 
 export default function FriendsScreen() {
   const { friends, searchResults, searching, searchUsers, addFriend, addFriendByEmail, acceptFriendRequest, removeFriend } = useFriends();
@@ -68,21 +63,22 @@ export default function FriendsScreen() {
     }
   };
 
-  const openInviteUrl = async (url: string, successMessage: string) => {
+  const sendSignupInvite = async (payload: { email?: string; phone?: string }, successMessage: string) => {
     setSendingInvite(true);
     setError('');
     setSuccessMsg('');
     try {
-      const canOpen = Platform.OS === 'web' || await Linking.canOpenURL(url);
-      if (!canOpen) {
-        setError('No app is available to send this invite.');
-        return;
-      }
+      const { error: inviteError } = await supabase.functions.invoke('invite-friend', {
+        body: payload,
+      });
 
-      await Linking.openURL(url);
-      setSuccessMsg(successMessage);
+      if (inviteError) {
+        setError(inviteError.message || 'Could not send invite');
+      } else {
+        setSuccessMsg(successMessage);
+      }
     } catch (inviteError: any) {
-      setError(inviteError.message || 'Could not open invite app');
+      setError(inviteError.message || 'Could not send invite');
     } finally {
       setSendingInvite(false);
     }
@@ -95,9 +91,7 @@ export default function FriendsScreen() {
       return;
     }
 
-    const subject = encodeURIComponent('Join me on Xo Cherie');
-    const body = encodeURIComponent(buildInviteMessage());
-    await openInviteUrl(`mailto:${encodeURIComponent(email)}?subject=${subject}&body=${body}`, 'Email invite opened.');
+    await sendSignupInvite({ email }, 'Email invite sent.');
   };
 
   const handleSendTextInvite = async () => {
@@ -107,9 +101,7 @@ export default function FriendsScreen() {
       return;
     }
 
-    const separator = Platform.OS === 'ios' ? '&' : '?';
-    const body = encodeURIComponent(buildInviteMessage());
-    await openInviteUrl(`sms:${phone}${separator}body=${body}`, 'Text invite opened.');
+    await sendSignupInvite({ phone }, 'Text invite sent.');
   };
 
   const handleCloseModal = () => {
@@ -339,7 +331,7 @@ export default function FriendsScreen() {
             ) : (
               <View>
                 <Text style={styles.emailDesc}>
-                  Invite someone new to Xo Cherie. This opens your email or messages app with a signup link.
+                  Invite someone new to Xo Cherie. We will send them a signup link for you.
                 </Text>
                 <Input
                   name="signup-invite-email"
@@ -351,7 +343,7 @@ export default function FriendsScreen() {
                   autoCapitalize="none"
                 />
                 <Button
-                  title={sendingInvite ? 'Opening...' : 'Send Email Invite'}
+                  title={sendingInvite ? 'Sending...' : 'Send Email Invite'}
                   onPress={handleSendEmailInvite}
                   disabled={!inviteEmail.trim() || sendingInvite}
                   leftIcon={<MaterialIcons name="mail-outline" size={18} color={theme.colors.white} />}
@@ -370,13 +362,13 @@ export default function FriendsScreen() {
                   keyboardType="phone-pad"
                 />
                 <Button
-                  title={sendingInvite ? 'Opening...' : 'Send Text Invite'}
+                  title={sendingInvite ? 'Sending...' : 'Send Text Invite'}
                   onPress={handleSendTextInvite}
                   disabled={!invitePhone.trim() || sendingInvite}
                   variant="outline"
                   leftIcon={<MaterialIcons name="sms" size={18} color={theme.colors.primary} />}
                 />
-                <Text style={styles.inviteLink}>Signup link: {APP_INVITE_URL}</Text>
+                <Text style={styles.inviteLink}>Invites include the Cherie Card signup link.</Text>
                 {successMsg ? (
                   <View style={styles.successRow}>
                     <MaterialIcons name="check-circle" size={16} color={theme.colors.success} />
