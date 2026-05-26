@@ -55,6 +55,35 @@ function normalizeStringArray(value: unknown): string[] {
   return [];
 }
 
+function normalizeEmail(value: unknown): string {
+  return typeof value === 'string' ? value.trim().toLowerCase() : '';
+}
+
+async function getFunctionErrorMessage(error: any): Promise<string> {
+  const fallbackMessage = error?.message || 'Request failed';
+  const response = error?.context;
+
+  if (!response || typeof response.clone !== 'function') {
+    return fallbackMessage;
+  }
+
+  try {
+    const body = await response.clone().json();
+    if (typeof body?.error === 'string' && body.error.trim()) {
+      return body.error;
+    }
+  } catch {
+    try {
+      const text = await response.clone().text();
+      if (text.trim()) return text;
+    } catch {
+      // Fall back below.
+    }
+  }
+
+  return fallbackMessage;
+}
+
 export function useCards() {
   const { user } = useAuth();
   const [sentCards, setSentCards] = useState<Card[]>([]);
@@ -82,6 +111,8 @@ export function useCards() {
     }
 
     try {
+      await claimInvitedCards();
+
       const { data: receivedData, error: receivedError } = await supabase
         .from('received_cards')
         .select('id, card_id, is_read, is_pinned, received_at, acknowledged_at')
@@ -169,6 +200,7 @@ export function useCards() {
         const storedRecipientInfo = c.recipient_info || {};
         const storedRecipientNames = normalizeStringArray(storedRecipientInfo.names);
         const storedRecipientIds = normalizeStringArray(storedRecipientInfo.ids);
+        const storedRecipientEmails = normalizeStringArray(storedRecipientInfo.emails);
         const finalRecipientNames = storedRecipientNames.length > 0
           ? storedRecipientNames
           : (dbRecipientNames.length > 0 ? dbRecipientNames : ['Unknown Recipient']);
@@ -188,6 +220,7 @@ export function useCards() {
           senderName: user.name || user.email,
           recipientIds: finalRecipientIds,
           recipientNames: finalRecipientNames,
+          recipientEmails: storedRecipientEmails,
           category: resolveCardCategory(c.design_template),
           templateId: c.design_template || 'bday-1',
           frontImage: resolveCardImage(c.front_design_url, c.design_template),
@@ -220,6 +253,7 @@ export function useCards() {
           senderName: user.name || user.email,
           recipientIds: normalizeStringArray(storedRecipientInfo.ids),
           recipientNames: normalizeStringArray(storedRecipientInfo.names),
+          recipientEmails: normalizeStringArray(storedRecipientInfo.emails),
           category: resolveCardCategory(c.design_template),
           templateId: c.design_template || 'bday-1',
           frontImage: resolveCardImage(c.front_design_url, c.design_template),
@@ -242,6 +276,15 @@ export function useCards() {
     }
   }
 
+  async function claimInvitedCards(): Promise<void> {
+    if (!user?.email) return;
+
+    const { error } = await supabase.functions.invoke('claim-card-invites');
+    if (error) {
+      console.warn('Failed to claim invited cards:', await getFunctionErrorMessage(error));
+    }
+  }
+
   async function sendCard(card: Card): Promise<void> {
     if (!user || !user.id) {
       throw new Error('User not authenticated');
@@ -255,15 +298,23 @@ export function useCards() {
       // Filter out custom-email recipients (not real UUIDs) before storing
       const validRecipientIds: string[] = [];
       const validRecipientNames: string[] = [];
-      const customEmailRecipients: string[] = [];
+      const customRecipientNames: string[] = [];
+      const customRecipientEmails: string[] = [];
+      let customEmailIndex = 0;
 
       card.recipientIds.forEach((id, idx) => {
         if (id && !id.startsWith('custom-') && isValidUUID(id)) {
           validRecipientIds.push(id);
           validRecipientNames.push(card.recipientNames[idx] || '');
         } else {
-          // For custom emails, store the email itself for display
-          customEmailRecipients.push(card.recipientNames[idx] || id);
+          const email = normalizeEmail(card.recipientEmails?.[customEmailIndex] || card.recipientNames[idx]);
+          const displayName = card.recipientNames[idx] || email || id;
+          customEmailIndex += 1;
+
+          customRecipientNames.push(displayName);
+          if (email) {
+            customRecipientEmails.push(email);
+          }
         }
       });
 
@@ -271,7 +322,8 @@ export function useCards() {
       // Only store valid UUIDs in ids to avoid trigger failures
       const recipientInfo = {
         ids: validRecipientIds,
-        names: [...validRecipientNames, ...customEmailRecipients],
+        names: [...validRecipientNames, ...customRecipientNames],
+        emails: customRecipientEmails,
       };
 
       // Always store front_design_url as a template reference so it can be resolved on any platform
@@ -312,6 +364,30 @@ export function useCards() {
         if (receivedError) {
           console.error('Failed to create received card for recipient', recipientId, ':', receivedError);
         }
+      }
+
+      const template = cardTemplates.find(t => t.id === card.templateId);
+      const inviteErrors: string[] = [];
+
+      for (const email of customRecipientEmails) {
+        const { error } = await supabase.functions.invoke('invite-friend', {
+          body: {
+            type: 'card',
+            email,
+            cardId: cardData.id,
+            cardTitle: template?.title || 'a card',
+            messagePreview: card.personalMessage?.slice(0, 180),
+            inviterName: card.senderName,
+          },
+        });
+
+        if (error) {
+          inviteErrors.push(`${email}: ${await getFunctionErrorMessage(error)}`);
+        }
+      }
+
+      if (inviteErrors.length > 0) {
+        throw new Error(`Card was saved, but invite delivery failed. ${inviteErrors.join(' ')}`);
       }
 
       // Reload cards to get updated data
@@ -453,6 +529,7 @@ export function useCards() {
             recipient_info: {
               ids: card.recipientIds,
               names: card.recipientNames,
+              emails: card.recipientEmails || [],
             },
           })
           .eq('id', card.id)
@@ -473,6 +550,7 @@ export function useCards() {
             recipient_info: {
               ids: card.recipientIds,
               names: card.recipientNames,
+              emails: card.recipientEmails || [],
             },
             status: 'draft',
           });

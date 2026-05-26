@@ -17,6 +17,10 @@ type InvitePayload = {
   email?: string;
   phone?: string;
   inviterName?: string;
+  type?: 'friend' | 'card';
+  cardId?: string;
+  cardTitle?: string;
+  messagePreview?: string;
 };
 
 function jsonResponse(body: unknown, status = 200) {
@@ -37,13 +41,28 @@ function normalizePhone(phone?: string) {
   return phone?.trim().replace(/[^\d+]/g, '') || '';
 }
 
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 function inviteMessage(inviterName?: string) {
   const sender = inviterName?.trim() || 'Someone';
   return `${sender} invited you to join Xo Cherie so you can send and save digital greeting cards together: ${appUrl}`;
 }
 
+function cardInviteMessage(payload: InvitePayload) {
+  const sender = payload.inviterName?.trim() || 'Someone';
+  const title = payload.cardTitle?.trim() || 'a card';
+  return `${sender} sent you ${title} on Xo Cherie. Sign up or sign in to open it: ${appUrl}`;
+}
+
 function inviteHtml(inviterName?: string) {
-  const sender = inviterName?.trim() || 'Someone';
+  const sender = escapeHtml(inviterName?.trim() || 'Someone');
   return `
     <div style="font-family: Arial, sans-serif; color: #1A1A1A; line-height: 1.5;">
       <h2>${sender} invited you to Xo Cherie</h2>
@@ -59,10 +78,34 @@ function inviteHtml(inviterName?: string) {
   `;
 }
 
-async function sendEmailInvite(email: string, inviterName?: string) {
+function cardInviteHtml(payload: InvitePayload) {
+  const sender = escapeHtml(payload.inviterName?.trim() || 'Someone');
+  const title = escapeHtml(payload.cardTitle?.trim() || 'a card');
+  const preview = payload.messagePreview?.trim();
+
+  return `
+    <div style="font-family: Arial, sans-serif; color: #1A1A1A; line-height: 1.5;">
+      <h2>${sender} sent you ${title}</h2>
+      <p>You have a new digital greeting card waiting in Xo Cherie.</p>
+      ${preview ? `<blockquote style="border-left: 4px solid #C17B66; margin: 16px 0; padding-left: 12px; color: #555555;">${escapeHtml(preview)}</blockquote>` : ''}
+      <p>
+        <a href="${appUrl}" style="display: inline-block; background: #C17B66; color: #FFFFFF; padding: 12px 18px; border-radius: 10px; text-decoration: none; font-weight: 700;">
+          Open Your Card
+        </a>
+      </p>
+      <p>Use the same email address this invite was sent to. Your card will appear in your inbox after you sign in.</p>
+      <p>If the button does not work, open this link:</p>
+      <p><a href="${appUrl}">${appUrl}</a></p>
+    </div>
+  `;
+}
+
+async function sendEmailInvite(email: string, payload: InvitePayload) {
   if (!resendApiKey) {
     return { error: 'RESEND_API_KEY is not configured' };
   }
+
+  const isCardInvite = payload.type === 'card';
 
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
@@ -73,9 +116,9 @@ async function sendEmailInvite(email: string, inviterName?: string) {
     body: JSON.stringify({
       from: inviteFromEmail,
       to: email,
-      subject: 'Join me on Xo Cherie',
-      text: inviteMessage(inviterName),
-      html: inviteHtml(inviterName),
+      subject: isCardInvite ? 'You received a card on Xo Cherie' : 'Join me on Xo Cherie',
+      text: isCardInvite ? cardInviteMessage(payload) : inviteMessage(payload.inviterName),
+      html: isCardInvite ? cardInviteHtml(payload) : inviteHtml(payload.inviterName),
     }),
   });
 
@@ -87,7 +130,7 @@ async function sendEmailInvite(email: string, inviterName?: string) {
   return { error: null };
 }
 
-async function sendSmsInvite(phone: string, inviterName?: string) {
+async function sendSmsInvite(phone: string, payload: InvitePayload) {
   if (!twilioAccountSid || !twilioAuthToken || !twilioFromPhone) {
     return { error: 'SMS invites require TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_FROM_PHONE secrets' };
   }
@@ -96,7 +139,7 @@ async function sendSmsInvite(phone: string, inviterName?: string) {
   const body = new URLSearchParams({
     To: phone,
     From: twilioFromPhone,
-    Body: inviteMessage(inviterName),
+    Body: payload.type === 'card' ? cardInviteMessage(payload) : inviteMessage(payload.inviterName),
   });
 
   const response = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/Messages.json`, {
@@ -156,6 +199,10 @@ Deno.serve(async (req) => {
   const email = normalizeEmail(payload.email);
   const phone = normalizePhone(payload.phone);
   const inviterName = payload.inviterName || user.email || undefined;
+  const invitePayload = {
+    ...payload,
+    inviterName,
+  };
 
   if (!email && !phone) {
     return jsonResponse({ error: 'Email or phone is required' }, 400);
@@ -167,12 +214,12 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: 'Enter a valid email address' }, 400);
     }
 
-    const { error } = await sendEmailInvite(email, inviterName);
+    const { error } = await sendEmailInvite(email, invitePayload);
     if (error) return jsonResponse({ error }, 502);
   }
 
   if (phone) {
-    const { error } = await sendSmsInvite(phone, inviterName);
+    const { error } = await sendSmsInvite(phone, invitePayload);
     if (error) return jsonResponse({ error }, 502);
   }
 

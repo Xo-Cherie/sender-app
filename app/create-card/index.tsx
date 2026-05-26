@@ -93,6 +93,7 @@ export default function CreateCardScreen() {
     try {
       const recipientIds: string[] = [];
       const recipientNames: string[] = [];
+      const recipientEmails: string[] = [];
 
       selectedRecipients.forEach(id => {
         const friend = friends.find(f => f.id === id);
@@ -105,9 +106,11 @@ export default function CreateCardScreen() {
       });
 
       if (customEmail.trim()) {
+        const normalizedEmail = customEmail.trim().toLowerCase();
         const customId = 'custom-' + Date.now();
         recipientIds.push(customId);
-        recipientNames.push(customEmail.split('@')[0]);
+        recipientNames.push(normalizedEmail.split('@')[0]);
+        recipientEmails.push(normalizedEmail);
       }
 
       // Always store as template reference - resolves correctly on load for both local and remote images
@@ -119,6 +122,7 @@ export default function CreateCardScreen() {
         senderName: senderDisplayName || user.name || user.email,
         recipientIds,
         recipientNames,
+        recipientEmails,
         category: selectedTemplate_data.category,
         templateId: selectedTemplate_data.id,
         frontImage: frontImageUrl,

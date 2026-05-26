@@ -42,6 +42,7 @@ export interface Card {
   senderName: string;
   recipientIds: string[];
   recipientNames: string[];
+  recipientEmails?: string[];
   category: CardCategory;
   templateId: string;
   frontImage: string | ReturnType<typeof require>;
