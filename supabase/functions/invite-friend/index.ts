@@ -168,12 +168,12 @@ Deno.serve(async (req) => {
     }
 
     const { error } = await sendEmailInvite(email, inviterName);
-    if (error) return jsonResponse({ error }, 500);
+    if (error) return jsonResponse({ error }, 502);
   }
 
   if (phone) {
     const { error } = await sendSmsInvite(phone, inviterName);
-    if (error) return jsonResponse({ error }, 500);
+    if (error) return jsonResponse({ error }, 502);
   }
 
   return jsonResponse({ ok: true });

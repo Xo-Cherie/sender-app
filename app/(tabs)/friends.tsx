@@ -63,6 +63,31 @@ export default function FriendsScreen() {
     }
   };
 
+  const getFunctionErrorMessage = async (inviteError: any) => {
+    const fallbackMessage = inviteError?.message || 'Could not send invite';
+    const response = inviteError?.context;
+
+    if (!response || typeof response.clone !== 'function') {
+      return fallbackMessage;
+    }
+
+    try {
+      const body = await response.clone().json();
+      if (typeof body?.error === 'string' && body.error.trim()) {
+        return body.error;
+      }
+    } catch {
+      try {
+        const text = await response.clone().text();
+        if (text.trim()) return text;
+      } catch {
+        // Fall back below.
+      }
+    }
+
+    return fallbackMessage;
+  };
+
   const sendSignupInvite = async (payload: { email?: string; phone?: string }, successMessage: string) => {
     setSendingInvite(true);
     setError('');
@@ -73,7 +98,7 @@ export default function FriendsScreen() {
       });
 
       if (inviteError) {
-        setError(inviteError.message || 'Could not send invite');
+        setError(await getFunctionErrorMessage(inviteError));
       } else {
         setSuccessMsg(successMessage);
       }
