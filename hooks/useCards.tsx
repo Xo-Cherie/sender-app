@@ -4,27 +4,12 @@ import { supabase } from '@/lib/supabase';
 import { invokeEdgeFunction } from '@/lib/edgeFunctions';
 import { useAuth } from './useAuth';
 import { CardCategory, cardTemplates } from '@/constants/cardTemplates';
+import { resolveCardFrontImage } from '@/lib/cardImages';
 
 // Helper to validate UUID format
 function isValidUUID(str: string): boolean {
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   return uuidRegex.test(str);
-}
-
-// Resolve front_design_url: if it's a template reference, get the actual image
-function resolveCardImage(frontDesignUrl: string | null, designTemplate: string | null): string | ReturnType<typeof require> {
-  if (frontDesignUrl && frontDesignUrl.startsWith('template:')) {
-    const templateId = frontDesignUrl.replace('template:', '');
-    const template = cardTemplates.find(t => t.id === templateId);
-    return template ? template.frontImage : '';
-  }
-  if (frontDesignUrl) return frontDesignUrl;
-  // Fallback: try to find by template ID
-  if (designTemplate) {
-    const template = cardTemplates.find(t => t.id === designTemplate);
-    if (template) return template.frontImage;
-  }
-  return '';
 }
 
 function resolveCardCategory(templateId: string | null): CardCategory {
@@ -150,7 +135,7 @@ export function useCards() {
             recipientNames: [user.name || user.email],
             category: resolveCardCategory(card.design_template),
             templateId: card.design_template,
-            frontImage: resolveCardImage(card.front_design_url, card.design_template),
+            frontImage: resolveCardFrontImage(card.front_design_url, card.design_template),
             personalMessage: card.message || '',
             mediaAttachments: card.media_attachments || [],
             gift: card.gift_details || undefined,
@@ -224,7 +209,7 @@ export function useCards() {
           recipientEmails: storedRecipientEmails,
           category: resolveCardCategory(c.design_template),
           templateId: c.design_template || 'bday-1',
-          frontImage: resolveCardImage(c.front_design_url, c.design_template),
+          frontImage: resolveCardFrontImage(c.front_design_url, c.design_template),
           personalMessage: c.message || '',
           mediaAttachments: c.media_attachments || [],
           gift: c.gift_details || undefined,
@@ -257,7 +242,7 @@ export function useCards() {
           recipientEmails: normalizeStringArray(storedRecipientInfo.emails),
           category: resolveCardCategory(c.design_template),
           templateId: c.design_template || 'bday-1',
-          frontImage: resolveCardImage(c.front_design_url, c.design_template),
+          frontImage: resolveCardFrontImage(c.front_design_url, c.design_template),
           personalMessage: c.message || '',
           mediaAttachments: c.media_attachments || [],
           gift: c.gift_details || undefined,

@@ -31,7 +31,17 @@ Create `supabase/functions/.env.local` from `supabase/functions/.env.example`, f
 npm run functions:serve
 ```
 
-### 2. Start the Project
+### 2. Configure Supabase Auth Redirects
+
+In the Supabase dashboard, open **Authentication → URL Configuration** and add these redirect URLs:
+
+- `http://localhost:8081/auth/callback` (local web)
+- `https://www.cheriecard.com/auth/callback` (production web)
+- `xocherie://auth/callback` (Android/iOS builds)
+
+Email confirmation links and magic links will land on `/auth/callback`, which completes sign-in and sends users to the app home screen.
+
+### 3. Start the Project
 
 - Start the development server (choose your platform):
 
@@ -42,7 +52,16 @@ npm run ios           # Launch iOS simulator
 npm run web           # Start the web version
 ```
 
-### 3. Lint the Code
+### 4. Build Android / iOS (EAS)
+
+EAS cloud builds use the Supabase variables in `eas.json`. Rebuild after changing them:
+
+```bash
+npx eas build --platform android --profile preview
+npx eas build --platform ios --profile preview
+```
+
+### 5. Lint the Code
 
 ```bash
 npm run lint

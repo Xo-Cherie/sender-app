@@ -1,9 +1,9 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
-import { Image } from 'expo-image';
 import { MaterialIcons } from '@expo/vector-icons';
 import { theme } from '@/constants/theme';
 import { ReceivedCard } from '@/types';
+import { CardImage } from '@/components/cards/CardImage';
 
 interface CardPreviewProps {
   card: ReceivedCard;
@@ -20,11 +20,7 @@ export function CardPreview({ card, onPress, showBadge = true }: CardPreviewProp
         pressed && styles.pressed,
       ]}
     >
-      <Image
-        source={(typeof card.frontImage === 'string' ? { uri: card.frontImage } : card.frontImage) as any}
-        style={styles.image}
-        contentFit="cover"
-      />
+      <CardImage source={card.frontImage} style={styles.image} resizeMode="cover" />
       
       <View style={styles.info}>
         <Text style={styles.sender} numberOfLines={1}>

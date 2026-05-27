@@ -2,6 +2,7 @@ import React, { createContext, useState, useEffect, ReactNode } from 'react';
 import { AppState } from 'react-native';
 import { Session, User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
+import { getAuthRedirectUrl } from '@/lib/authRedirect';
 import { User } from '@/types';
 
 interface AuthContextType {
@@ -103,7 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             first_name: firstName,
             last_name: lastName,
           },
-          emailRedirectTo: undefined,
+          emailRedirectTo: getAuthRedirectUrl(),
         },
       });
 
@@ -153,7 +154,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         type: 'signup',
         email,
         options: {
-          emailRedirectTo: undefined,
+          emailRedirectTo: getAuthRedirectUrl(),
         },
       });
 

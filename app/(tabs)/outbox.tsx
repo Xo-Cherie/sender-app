@@ -2,11 +2,11 @@ import React from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { theme } from '@/constants/theme';
 import { useCards } from '@/hooks/useCards';
 import { cardTemplates } from '@/constants/cardTemplates';
+import { CardImage } from '@/components/cards/CardImage';
 import { RecipientDeliveryStatus } from '@/types';
 
 export default function OutboxScreen() {
@@ -122,12 +122,8 @@ export default function OutboxScreen() {
                       }
                     }}
                   >
-                    {template?.frontImage ? (
-                      <Image
-                        source={typeof template.frontImage === 'string' ? { uri: template.frontImage } : template.frontImage}
-                        style={styles.cardThumbnail}
-                        contentFit="cover"
-                      />
+                    {card.frontImage ? (
+                      <CardImage source={card.frontImage} style={styles.cardThumbnail} resizeMode="cover" />
                     ) : (
                       <View style={styles.cardIcon}>
                         <MaterialIcons

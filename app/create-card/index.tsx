@@ -11,8 +11,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
 import { theme } from '@/constants/theme';
+import { CardImage } from '@/components/cards/CardImage';
 import { cardTemplates, categoryLabels, CardCategory } from '@/constants/cardTemplates';
 import { useFriends } from '@/hooks/useFriends';
 import { useCards } from '@/hooks/useCards';
@@ -234,10 +234,10 @@ export default function CreateCardScreen() {
                     ]}
                   >
                     <View style={styles.templateImageWrapper}>
-                      <Image
-                        source={typeof template.frontImage === 'string' ? { uri: template.frontImage } : template.frontImage}
+                      <CardImage
+                        source={template.frontImage}
                         style={styles.templateImage}
-                        contentFit="cover"
+                        resizeMode="cover"
                       />
                       <View style={styles.templateTitleOverlay}>
                         <Text style={styles.templateTitleText} numberOfLines={2}>{template.title}</Text>
@@ -450,10 +450,10 @@ export default function CreateCardScreen() {
               return template ? (
                 <>
                   <View style={styles.modalImageWrapper}>
-                    <Image
-                      source={typeof template.frontImage === 'string' ? { uri: template.frontImage } : template.frontImage}
+                    <CardImage
+                      source={template.frontImage}
                       style={styles.modalImage}
-                      contentFit="contain"
+                      resizeMode="contain"
                     />
                     <View style={styles.modalTitleOverlay}>
                       <Text style={styles.modalTitleText}>{template.title}</Text>

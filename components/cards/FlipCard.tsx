@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Pressable, StyleSheet, Text, Dimensions, Image, ImageSourcePropType, Platform } from 'react-native';
+import { View, Pressable, StyleSheet, Text, Dimensions } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -7,9 +7,11 @@ import Animated, {
   interpolate,
 } from 'react-native-reanimated';
 import { theme } from '@/constants/theme';
+import { CardImage } from '@/components/cards/CardImage';
+import { CardImageValue } from '@/lib/cardImages';
 
 interface FlipCardProps {
-  frontImage: string | ReturnType<typeof require>;
+  frontImage: CardImageValue;
   cardTitle?: string;
   backMessage: string;
   recipientName?: string;
@@ -25,23 +27,6 @@ const sizes = {
   medium: { width: screenWidth * 0.7, height: screenWidth * 0.9 },
   large: { width: screenWidth * 0.85, height: screenWidth * 1.1 },
 };
-
-function getImageSource(frontImage: string | ReturnType<typeof require>) {
-  if (typeof frontImage === 'string') {
-    return { uri: frontImage };
-  }
-
-  const resolvedAsset = Image.resolveAssetSource(frontImage as ImageSourcePropType);
-  return resolvedAsset?.uri ? { uri: resolvedAsset.uri } : frontImage;
-}
-
-function getImageUri(frontImage: string | ReturnType<typeof require>) {
-  if (typeof frontImage === 'string') {
-    return frontImage;
-  }
-
-  return Image.resolveAssetSource(frontImage as ImageSourcePropType)?.uri || '';
-}
 
 export function FlipCard({
   frontImage,
@@ -92,25 +77,7 @@ export function FlipCard({
     <Pressable onPress={handlePress} style={[styles.container, { width, height }]}>
       {/* Front */}
       <Animated.View style={[styles.card, styles.front, frontAnimatedStyle, { width, height }]}>
-        {Platform.OS === 'web' ? (
-          <View
-            style={[
-              styles.image,
-              {
-                backgroundImage: `url("${getImageUri(frontImage)}")`,
-                backgroundPosition: 'center',
-                backgroundRepeat: 'no-repeat',
-                backgroundSize: 'cover',
-              } as any,
-            ]}
-          />
-        ) : (
-          <Image
-            source={getImageSource(frontImage) as ImageSourcePropType}
-            style={styles.image}
-            resizeMode="cover"
-          />
-        )}
+        <CardImage source={frontImage} style={styles.image} resizeMode="cover" />
         {cardTitle ? (
           <View style={styles.titleOverlay}>
             <Text style={styles.cardTitle}>{cardTitle}</Text>

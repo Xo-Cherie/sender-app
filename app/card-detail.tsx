@@ -10,6 +10,7 @@ import { supabase } from '@/lib/supabase';
 import { FlipCard } from '@/components/cards/FlipCard';
 import { Button } from '@/components/ui/Button';
 import { cardTemplates } from '@/constants/cardTemplates';
+import { normalizeCardFrontImage, resolveCardFrontImage } from '@/lib/cardImages';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import { Card, ReceivedCard } from '@/types';
 
@@ -83,7 +84,7 @@ export default function CardDetailScreen() {
             recipientNames: finalRecipientNames,
             category: 'birthday' as any,
             templateId: cardData.design_template || 'bday-1',
-            frontImage: resolveImage(cardData.front_design_url || ''),
+            frontImage: resolveCardFrontImage(cardData.front_design_url, cardData.design_template),
             personalMessage: cardData.message || '',
             mediaAttachments: cardData.media_attachments || [],
             gift: cardData.gift_details || undefined,
@@ -131,7 +132,7 @@ export default function CardDetailScreen() {
             recipientNames: [currentUser.name || currentUser.email],
             category: 'birthday' as any,
             templateId: cardData.design_template || 'bday-1',
-            frontImage: resolveImage(cardData.front_design_url || ''),
+            frontImage: resolveCardFrontImage(cardData.front_design_url, cardData.design_template),
             personalMessage: cardData.message || '',
             mediaAttachments: cardData.media_attachments || [],
             gift: cardData.gift_details,
@@ -187,27 +188,8 @@ export default function CardDetailScreen() {
     );
   }
 
-  // Resolve template reference to actual image
-  function resolveImage(frontDesignUrl: unknown): string | ReturnType<typeof require> {
-    if (typeof frontDesignUrl === 'number') {
-      return frontDesignUrl as ReturnType<typeof require>;
-    }
-
-    if (typeof frontDesignUrl !== 'string') {
-      return '';
-    }
-
-    if (frontDesignUrl.startsWith('template:')) {
-      const templateId = frontDesignUrl.replace('template:', '');
-      const template = cardTemplates.find(t => t.id === templateId);
-      return template ? template.frontImage : frontDesignUrl;
-    }
-
-    return frontDesignUrl;
-  }
-
   // Ensure required fields have values
-  const resolvedFrontImage = resolveImage(card.frontImage);
+  const resolvedFrontImage = normalizeCardFrontImage(card.frontImage);
   const displayFrontImage = resolvedFrontImage || 'https://images.unsplash.com/photo-1513885535751-8b9238bd34c2?w=800';
   const displayMessage = card.personalMessage || 'No message';
   const displaySenderName = card.senderName || 'Unknown';
