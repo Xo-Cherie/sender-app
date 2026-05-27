@@ -9,7 +9,6 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { FlipCard } from '@/components/cards/FlipCard';
 import { Button } from '@/components/ui/Button';
-import { cardTemplates } from '@/constants/cardTemplates';
 import { normalizeCardFrontImage, resolveCardFrontImage } from '@/lib/cardImages';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import { Card, ReceivedCard } from '@/types';
@@ -200,13 +199,6 @@ export default function CardDetailScreen() {
     ? displayRecipientNames[0]
     : 'You';
 
-  // Get title from template
-  const templateId = typeof card.frontImage === 'string'
-    ? card.frontImage.replace('template:', '')
-    : card.templateId;
-  const cardTemplate = cardTemplates.find(t => t.id === templateId);
-  const cardTitle = cardTemplate?.title;
-
   console.log('🎨 RENDERING FLIPCARD WITH:');
   console.log('  frontImage:', displayFrontImage);
   console.log('  backMessage:', displayMessage);
@@ -258,7 +250,6 @@ export default function CardDetailScreen() {
         <View style={styles.cardContainer}>
           <FlipCard
             frontImage={displayFrontImage}
-            cardTitle={cardTitle}
             backMessage={displayMessage}
             recipientName={displayRecipientName}
             senderName={displaySenderName}

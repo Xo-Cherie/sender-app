@@ -239,9 +239,6 @@ export default function CreateCardScreen() {
                         style={styles.templateImage}
                         resizeMode="cover"
                       />
-                      <View style={styles.templateTitleOverlay}>
-                        <Text style={styles.templateTitleText} numberOfLines={2}>{template.title}</Text>
-                      </View>
                     </View>
                     <Text style={styles.templateName}>{template.name}</Text>
                   </Pressable>
@@ -403,7 +400,6 @@ export default function CreateCardScreen() {
             <View style={styles.previewContainer}>
               <FlipCard
                 frontImage={selectedTemplate_data.frontImage}
-                cardTitle={selectedTemplate_data.title}
                 backMessage={personalMessage || selectedTemplate_data.backMessage}
                 recipientName={recipientDisplayName || 'Recipient'}
                 senderName={senderDisplayName || 'You'}
@@ -455,9 +451,6 @@ export default function CreateCardScreen() {
                       style={styles.modalImage}
                       resizeMode="contain"
                     />
-                    <View style={styles.modalTitleOverlay}>
-                      <Text style={styles.modalTitleText}>{template.title}</Text>
-                    </View>
                   </View>
                   <Text style={styles.modalTemplateName}>{template.name}</Text>
                   <Button
@@ -572,27 +565,6 @@ const styles = StyleSheet.create({
   templateImage: {
     width: TEMPLATE_CARD_WIDTH,
     height: TEMPLATE_IMAGE_HEIGHT,
-  },
-  templateTitleOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    backgroundColor: 'rgba(0,0,0,0.38)',
-    alignItems: 'center',
-  },
-  templateTitleText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '700',
-    textAlign: 'center',
-    fontFamily: theme.fonts.serif,
-    textShadowColor: 'rgba(0,0,0,0.5)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
-    letterSpacing: 0.3,
   },
   templateName: {
     fontSize: 12,
@@ -748,27 +720,6 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 400,
     borderRadius: theme.borderRadius.md,
-  },
-  modalTitleOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    paddingVertical: 16,
-    paddingHorizontal: 12,
-    backgroundColor: 'rgba(0,0,0,0.38)',
-    alignItems: 'center',
-  },
-  modalTitleText: {
-    color: '#FFFFFF',
-    fontSize: 22,
-    fontWeight: '700',
-    textAlign: 'center',
-    fontFamily: theme.fonts.serif,
-    textShadowColor: 'rgba(0,0,0,0.5)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
-    letterSpacing: 0.5,
   },
   modalTemplateName: {
     fontSize: 20,

@@ -12,7 +12,6 @@ import { CardImageValue } from '@/lib/cardImages';
 
 interface FlipCardProps {
   frontImage: CardImageValue;
-  cardTitle?: string;
   backMessage: string;
   recipientName?: string;
   senderName?: string;
@@ -30,7 +29,6 @@ const sizes = {
 
 export function FlipCard({
   frontImage,
-  cardTitle,
   backMessage,
   recipientName,
   senderName,
@@ -78,14 +76,6 @@ export function FlipCard({
       {/* Front */}
       <Animated.View style={[styles.card, styles.front, frontAnimatedStyle, { width, height }]}>
         <CardImage source={frontImage} style={styles.image} resizeMode="cover" />
-        {cardTitle ? (
-          <View style={styles.titleOverlay}>
-            <Text style={styles.cardTitle}>{cardTitle}</Text>
-          </View>
-        ) : null}
-        <View style={styles.frontOverlay}>
-          <Text style={styles.tapHint}>Tap to open</Text>
-        </View>
       </Animated.View>
 
       {/* Back */}
@@ -126,41 +116,6 @@ const styles = StyleSheet.create({
   image: {
     width: '100%',
     height: '100%',
-  },
-  titleOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    paddingVertical: 14,
-    paddingHorizontal: 12,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-    alignItems: 'center',
-  },
-  cardTitle: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: '700',
-    textAlign: 'center',
-    fontFamily: theme.fonts.serif,
-    textShadowColor: 'rgba(0,0,0,0.55)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
-    letterSpacing: 0.5,
-  },
-  frontOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(0,0,0,0.28)',
-    padding: theme.spacing.sm,
-    alignItems: 'center',
-  },
-  tapHint: {
-    color: theme.colors.white,
-    fontSize: 12,
-    fontWeight: '500',
   },
   backContent: {
     flex: 1,
