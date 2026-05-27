@@ -25,6 +25,8 @@ EXPO_PUBLIC_SUPABASE_FUNCTIONS_URL=http://127.0.0.1:54321/functions/v1
 
 If you are testing from a physical phone, replace `127.0.0.1` with your computer's LAN IP address.
 
+If you are testing local functions from an Android emulator, the app automatically maps `127.0.0.1` to `10.0.2.2`, which is Android's address for the host computer.
+
 Create `supabase/functions/.env.local` from `supabase/functions/.env.example`, fill in the Supabase/Resend secrets, then run:
 
 ```bash

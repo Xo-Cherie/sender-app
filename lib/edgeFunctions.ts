@@ -1,4 +1,5 @@
 import { supabase, supabaseAnonKey, supabaseUrl } from '@/lib/supabase';
+import { Platform } from 'react-native';
 
 type InvokeOptions = {
   body?: Record<string, any>;
@@ -9,7 +10,23 @@ type InvokeResult<T> = {
   error: any | null;
 };
 
-const functionsUrlOverride = process.env.EXPO_PUBLIC_SUPABASE_FUNCTIONS_URL?.replace(/\/$/, '');
+function getFunctionsUrlOverride() {
+  const rawUrl = process.env.EXPO_PUBLIC_SUPABASE_FUNCTIONS_URL?.trim();
+  if (!rawUrl) return undefined;
+
+  const normalizedUrl = rawUrl.replace(/\/$/, '');
+
+  if (Platform.OS === 'android') {
+    return normalizedUrl.replace(
+      /^(https?:\/\/)(localhost|127\.0\.0\.1)(?=[:/])/,
+      (_match, protocol) => `${protocol}10.0.2.2`
+    );
+  }
+
+  return normalizedUrl;
+}
+
+const functionsUrlOverride = getFunctionsUrlOverride();
 
 function createFunctionError(message: string, response?: Response) {
   const error = new Error(message) as Error & { context?: Response };
@@ -72,9 +89,13 @@ export async function invokeEdgeFunction<T = unknown>(
 
     return { data, error: null };
   } catch (error: any) {
+    const message = functionsUrlOverride
+      ? `Could not reach Edge Function at ${functionsUrlOverride}. Make sure Supabase functions are running and reachable from this device.`
+      : error.message || 'Could not reach Edge Function';
+
     return {
       data: null,
-      error: createFunctionError(error.message || 'Could not reach Edge Function'),
+      error: createFunctionError(message),
     };
   }
 }
