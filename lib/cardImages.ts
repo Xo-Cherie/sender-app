@@ -12,6 +12,11 @@ export function resolveCardFrontImage(
     const templateId = frontDesignUrl.replace('template:', '');
     const template = cardTemplates.find((t) => t.id === templateId);
     if (template) return template.frontImage;
+
+    const fallbackTemplate = designTemplate
+      ? cardTemplates.find((t) => t.id === designTemplate)
+      : undefined;
+    return fallbackTemplate?.frontImage || cardTemplates[0]?.frontImage || '';
   }
 
   if (frontDesignUrl && typeof frontDesignUrl === 'string') {

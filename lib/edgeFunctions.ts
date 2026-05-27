@@ -1,7 +1,7 @@
 import { supabase, supabaseAnonKey, supabaseUrl } from '@/lib/supabase';
 
 type InvokeOptions = {
-  body?: unknown;
+  body?: Record<string, any>;
 };
 
 type InvokeResult<T> = {
