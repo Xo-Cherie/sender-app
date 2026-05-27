@@ -1,3 +1,4 @@
+import { Asset } from 'expo-asset';
 import { Image, ImageSourcePropType } from 'react-native';
 import { cardTemplates } from '@/constants/cardTemplates';
 
@@ -53,6 +54,15 @@ export function getCardImageUri(frontImage: CardImageValue): string {
     return frontImage;
   }
 
+  const asset = Asset.fromModule(frontImage);
+  if (asset?.uri) {
+    return asset.uri;
+  }
+
+  if (asset?.localUri) {
+    return asset.localUri;
+  }
+
   const resolved = Image.resolveAssetSource(frontImage as ImageSourcePropType);
   return resolved?.uri || '';
 }
@@ -62,6 +72,6 @@ export function getCardImageSource(frontImage: CardImageValue): ImageSourcePropT
     return { uri: frontImage };
   }
 
-  const resolved = Image.resolveAssetSource(frontImage as ImageSourcePropType);
-  return resolved?.uri ? { uri: resolved.uri } : (frontImage as ImageSourcePropType);
+  const uri = getCardImageUri(frontImage);
+  return uri ? { uri } : (frontImage as ImageSourcePropType);
 }

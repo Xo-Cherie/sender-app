@@ -48,19 +48,28 @@ export function CardImage({
     return (
       <View
         style={[
+          style as StyleProp<ViewStyle>,
           containerStyle,
           {
             width,
             height,
             borderRadius,
             overflow: 'hidden',
-            backgroundImage: `url("${uri}")`,
-            backgroundPosition: 'center',
-            backgroundRepeat: 'no-repeat',
-            backgroundSize: resizeMode === 'contain' ? 'contain' : 'cover',
-          } as ViewStyle,
+          },
         ]}
-      />
+      >
+        {React.createElement('img', {
+          src: uri,
+          alt: '',
+          draggable: false,
+          style: {
+            display: 'block',
+            width: '100%',
+            height: '100%',
+            objectFit: resizeMode === 'contain' ? 'contain' : 'cover',
+          },
+        })}
+      </View>
     );
   }
 
