@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { View, Pressable, StyleSheet, Text, Dimensions, Image as RNImage, ImageSourcePropType } from 'react-native';
-import { Image } from 'expo-image';
+import { View, Pressable, StyleSheet, Text, Dimensions, Image, ImageSourcePropType, Platform } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -32,8 +31,16 @@ function getImageSource(frontImage: string | ReturnType<typeof require>) {
     return { uri: frontImage };
   }
 
-  const resolvedAsset = RNImage.resolveAssetSource(frontImage as ImageSourcePropType);
+  const resolvedAsset = Image.resolveAssetSource(frontImage as ImageSourcePropType);
   return resolvedAsset?.uri ? { uri: resolvedAsset.uri } : frontImage;
+}
+
+function getImageUri(frontImage: string | ReturnType<typeof require>) {
+  if (typeof frontImage === 'string') {
+    return frontImage;
+  }
+
+  return Image.resolveAssetSource(frontImage as ImageSourcePropType)?.uri || '';
 }
 
 export function FlipCard({
@@ -85,11 +92,25 @@ export function FlipCard({
     <Pressable onPress={handlePress} style={[styles.container, { width, height }]}>
       {/* Front */}
       <Animated.View style={[styles.card, styles.front, frontAnimatedStyle, { width, height }]}>
-        <Image 
-          source={getImageSource(frontImage) as any}
-          style={styles.image} 
-          contentFit="cover" 
-        />
+        {Platform.OS === 'web' ? (
+          <View
+            style={[
+              styles.image,
+              {
+                backgroundImage: `url("${getImageUri(frontImage)}")`,
+                backgroundPosition: 'center',
+                backgroundRepeat: 'no-repeat',
+                backgroundSize: 'cover',
+              } as any,
+            ]}
+          />
+        ) : (
+          <Image
+            source={getImageSource(frontImage) as ImageSourcePropType}
+            style={styles.image}
+            resizeMode="cover"
+          />
+        )}
         {cardTitle ? (
           <View style={styles.titleOverlay}>
             <Text style={styles.cardTitle}>{cardTitle}</Text>
