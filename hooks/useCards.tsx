@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Card, ReceivedCard, RecipientDeliveryStatus } from '@/types';
 import { supabase } from '@/lib/supabase';
+import { invokeEdgeFunction } from '@/lib/edgeFunctions';
 import { useAuth } from './useAuth';
 import { CardCategory, cardTemplates } from '@/constants/cardTemplates';
 
@@ -279,7 +280,7 @@ export function useCards() {
   async function claimInvitedCards(): Promise<void> {
     if (!user?.email) return;
 
-    const { error } = await supabase.functions.invoke('claim-card-invites');
+    const { error } = await invokeEdgeFunction('claim-card-invites');
     if (error) {
       console.warn('Failed to claim invited cards:', await getFunctionErrorMessage(error));
     }
@@ -370,7 +371,7 @@ export function useCards() {
       const inviteErrors: string[] = [];
 
       for (const email of customRecipientEmails) {
-        const { error } = await supabase.functions.invoke('invite-friend', {
+        const { error } = await invokeEdgeFunction('invite-friend', {
           body: {
             type: 'card',
             email,

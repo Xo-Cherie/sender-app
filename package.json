@@ -8,6 +8,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "build": "expo export --platform web",
+    "functions:serve": "supabase functions serve --no-verify-jwt --env-file supabase/functions/.env.local",
     "lint": "expo lint"
   },
   "dependencies": {

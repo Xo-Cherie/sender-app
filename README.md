@@ -17,6 +17,20 @@ EXPO_PUBLIC_SUPABASE_URL=your-supabase-project-url
 EXPO_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
 ```
 
+To test Edge Functions locally, also add:
+
+```bash
+EXPO_PUBLIC_SUPABASE_FUNCTIONS_URL=http://127.0.0.1:54321/functions/v1
+```
+
+If you are testing from a physical phone, replace `127.0.0.1` with your computer's LAN IP address.
+
+Create `supabase/functions/.env.local` from `supabase/functions/.env.example`, fill in the Supabase/Resend secrets, then run:
+
+```bash
+npm run functions:serve
+```
+
 ### 2. Start the Project
 
 - Start the development server (choose your platform):

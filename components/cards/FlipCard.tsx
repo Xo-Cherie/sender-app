@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Pressable, StyleSheet, Text, Dimensions } from 'react-native';
+import { View, Pressable, StyleSheet, Text, Dimensions, Image as RNImage, ImageSourcePropType } from 'react-native';
 import { Image } from 'expo-image';
 import Animated, {
   useSharedValue,
@@ -26,6 +26,15 @@ const sizes = {
   medium: { width: screenWidth * 0.7, height: screenWidth * 0.9 },
   large: { width: screenWidth * 0.85, height: screenWidth * 1.1 },
 };
+
+function getImageSource(frontImage: string | ReturnType<typeof require>) {
+  if (typeof frontImage === 'string') {
+    return { uri: frontImage };
+  }
+
+  const resolvedAsset = RNImage.resolveAssetSource(frontImage as ImageSourcePropType);
+  return resolvedAsset?.uri ? { uri: resolvedAsset.uri } : frontImage;
+}
 
 export function FlipCard({
   frontImage,
@@ -77,7 +86,7 @@ export function FlipCard({
       {/* Front */}
       <Animated.View style={[styles.card, styles.front, frontAnimatedStyle, { width, height }]}>
         <Image 
-          source={(typeof frontImage === 'string' ? { uri: frontImage } : frontImage) as any} 
+          source={getImageSource(frontImage) as any}
           style={styles.image} 
           contentFit="cover" 
         />

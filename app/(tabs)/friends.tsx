@@ -7,7 +7,7 @@ import { useFriends } from '@/hooks/useFriends';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Image } from 'expo-image';
-import { supabase } from '@/lib/supabase';
+import { invokeEdgeFunction } from '@/lib/edgeFunctions';
 
 export default function FriendsScreen() {
   const { friends, searchResults, searching, searchUsers, addFriend, addFriendByEmail, acceptFriendRequest, removeFriend } = useFriends();
@@ -93,7 +93,7 @@ export default function FriendsScreen() {
     setError('');
     setSuccessMsg('');
     try {
-      const { error: inviteError } = await supabase.functions.invoke('invite-friend', {
+      const { error: inviteError } = await invokeEdgeFunction('invite-friend', {
         body: payload,
       });
 
