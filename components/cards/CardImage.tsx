@@ -1,7 +1,7 @@
 import React from 'react';
 import { ImageStyle, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 import { Image as ExpoImage, ImageContentFit } from 'expo-image';
-import { CardImageValue, normalizeCardFrontImage } from '@/lib/cardImages';
+import { CardImageValue, normalizeCardFrontImage, getCardImageSource } from '@/lib/cardImages';
 
 interface CardImageProps {
   source: CardImageValue | unknown;
@@ -35,10 +35,9 @@ export function CardImage({
     return <View style={[style, containerStyle, styles.placeholder]} />;
   }
 
-  // expo-image reliably resolves require()'d bundled assets and remote URIs on
-  // both web and native. A bundled asset is a number; a remote/template-resolved
-  // value is a string URI.
-  const imageSource = typeof frontImage === 'number' ? frontImage : { uri: frontImage };
+  // getCardImageSource resolves numeric require() asset IDs to a URI-based
+  // source object, which works reliably on both web and native.
+  const imageSource = getCardImageSource(frontImage);
 
   return (
     <ExpoImage

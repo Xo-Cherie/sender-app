@@ -6,7 +6,7 @@ import {
   ScrollView,
   Pressable,
   Modal,
-  Dimensions,
+  useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -23,13 +23,13 @@ import { Input } from '@/components/ui/Input';
 import { FlipCard } from '@/components/cards/FlipCard';
 import { VoiceMemoRecorder } from '@/components/cards/VoiceMemoRecorder';
 
-const SCREEN_WIDTH = Dimensions.get('window').width;
-const TEMPLATE_CARD_WIDTH = Math.floor((SCREEN_WIDTH - 24 * 2 - 16) / 2);
-const TEMPLATE_IMAGE_HEIGHT = Math.floor(TEMPLATE_CARD_WIDTH * 1.4);
-
 type Step = 'category' | 'template' | 'recipients' | 'message' | 'media' | 'gift' | 'preview';
 
 export default function CreateCardScreen() {
+  const { width: screenWidth } = useWindowDimensions();
+  const templateCardWidth = Math.max(Math.floor((screenWidth - 24 * 2 - 16) / 2), 120);
+  const templateImageHeight = Math.floor(templateCardWidth * 1.4);
+
   const router = useRouter();
   const { friends } = useFriends();
   const { sendCard } = useCards();
@@ -230,13 +230,14 @@ export default function CreateCardScreen() {
                     onPress={() => setPreviewTemplate(template.id)}
                     style={[
                       styles.templateCard,
+                      { width: templateCardWidth },
                       selectedTemplate === template.id && styles.templateCardActive,
                     ]}
                   >
-                    <View style={styles.templateImageWrapper}>
+                    <View style={[styles.templateImageWrapper, { width: templateCardWidth, height: templateImageHeight }]}>
                       <CardImage
                         source={template.frontImage}
-                        style={styles.templateImage}
+                        style={{ width: templateCardWidth, height: templateImageHeight }}
                         resizeMode="cover"
                       />
                     </View>
@@ -547,7 +548,6 @@ const styles = StyleSheet.create({
     gap: theme.spacing.md,
   },
   templateCard: {
-    width: TEMPLATE_CARD_WIDTH,
     borderWidth: 2,
     borderColor: 'transparent',
     borderRadius: theme.borderRadius.md,
@@ -558,13 +558,7 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.primary,
   },
   templateImageWrapper: {
-    width: TEMPLATE_CARD_WIDTH,
-    height: TEMPLATE_IMAGE_HEIGHT,
     position: 'relative',
-  },
-  templateImage: {
-    width: TEMPLATE_CARD_WIDTH,
-    height: TEMPLATE_IMAGE_HEIGHT,
   },
   templateName: {
     fontSize: 12,
