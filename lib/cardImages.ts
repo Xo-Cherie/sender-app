@@ -54,17 +54,17 @@ export function getCardImageUri(frontImage: CardImageValue): string {
     return frontImage;
   }
 
-  const asset = Asset.fromModule(frontImage);
-  if (asset?.uri) {
-    return asset.uri;
-  }
-
-  if (asset?.localUri) {
-    return asset.localUri;
-  }
-
+  // For bundled assets (require()'d modules), resolveAssetSource is the most
+  // reliable resolver on both web and native. Asset.fromModule().uri can be
+  // empty on web until the asset is downloaded, which previously caused the
+  // card artwork to fall back to a grey placeholder.
   const resolved = Image.resolveAssetSource(frontImage as ImageSourcePropType);
-  return resolved?.uri || '';
+  if (resolved?.uri) {
+    return resolved.uri;
+  }
+
+  const asset = Asset.fromModule(frontImage);
+  return asset?.uri || asset?.localUri || '';
 }
 
 export function getCardImageSource(frontImage: CardImageValue): ImageSourcePropType {

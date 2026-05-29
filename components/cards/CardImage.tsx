@@ -1,26 +1,26 @@
 import React from 'react';
-import {
-  Image,
-  ImageSourcePropType,
-  ImageStyle,
-  Platform,
-  StyleProp,
-  StyleSheet,
-  View,
-  ViewStyle,
-} from 'react-native';
-import {
-  CardImageValue,
-  getCardImageSource,
-  getCardImageUri,
-  normalizeCardFrontImage,
-} from '@/lib/cardImages';
+import { ImageStyle, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
+import { Image as ExpoImage, ImageContentFit } from 'expo-image';
+import { CardImageValue, normalizeCardFrontImage } from '@/lib/cardImages';
 
 interface CardImageProps {
   source: CardImageValue | unknown;
   style?: StyleProp<ImageStyle>;
   containerStyle?: StyleProp<ViewStyle>;
   resizeMode?: 'cover' | 'contain' | 'stretch' | 'center';
+}
+
+function toContentFit(resizeMode: CardImageProps['resizeMode']): ImageContentFit {
+  switch (resizeMode) {
+    case 'contain':
+      return 'contain';
+    case 'stretch':
+      return 'fill';
+    case 'center':
+      return 'none';
+    default:
+      return 'cover';
+  }
 }
 
 export function CardImage({
@@ -30,54 +30,22 @@ export function CardImage({
   resizeMode = 'cover',
 }: CardImageProps) {
   const frontImage = normalizeCardFrontImage(source);
-  const flatStyle = StyleSheet.flatten(style) || {};
-  const width = flatStyle.width ?? '100%';
-  const height = flatStyle.height ?? '100%';
-  const borderRadius = flatStyle.borderRadius;
 
   if (!frontImage) {
     return <View style={[style, containerStyle, styles.placeholder]} />;
   }
 
-  if (Platform.OS === 'web') {
-    const uri = getCardImageUri(frontImage);
-    if (!uri) {
-      return <View style={[style, containerStyle, styles.placeholder]} />;
-    }
-
-    return (
-      <View
-        style={[
-          style as StyleProp<ViewStyle>,
-          containerStyle,
-          {
-            width,
-            height,
-            borderRadius,
-            overflow: 'hidden',
-          },
-        ]}
-      >
-        {React.createElement('img', {
-          src: uri,
-          alt: '',
-          draggable: false,
-          style: {
-            display: 'block',
-            width: '100%',
-            height: '100%',
-            objectFit: resizeMode === 'contain' ? 'contain' : 'cover',
-          },
-        })}
-      </View>
-    );
-  }
+  // expo-image reliably resolves require()'d bundled assets and remote URIs on
+  // both web and native. A bundled asset is a number; a remote/template-resolved
+  // value is a string URI.
+  const imageSource = typeof frontImage === 'number' ? frontImage : { uri: frontImage };
 
   return (
-    <Image
-      source={getCardImageSource(frontImage) as ImageSourcePropType}
-      style={style}
-      resizeMode={resizeMode}
+    <ExpoImage
+      source={imageSource}
+      style={[style, containerStyle as StyleProp<ImageStyle>]}
+      contentFit={toContentFit(resizeMode)}
+      transition={150}
     />
   );
 }

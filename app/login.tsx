@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,7 @@ import {
   Pressable,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { theme } from '@/constants/theme';
 import { useAuth } from '@/hooks/useAuth';
@@ -17,20 +17,47 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 
 type AuthScreen = 'signIn' | 'signUp' | 'verify';
+type AuthSearchParams = {
+  screen?: string | string[];
+  mode?: string | string[];
+  email?: string | string[];
+};
 const VERIFICATION_CODE_LENGTH = 8;
+
+function getFirstParam(value?: string | string[]) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function getRequestedScreen(params: AuthSearchParams): AuthScreen {
+  const requestedScreen = (getFirstParam(params.screen) || getFirstParam(params.mode) || '').toLowerCase();
+  return ['signup', 'sign-up', 'sign_up'].includes(requestedScreen) ? 'signUp' : 'signIn';
+}
 
 export default function LoginScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<AuthSearchParams>();
   const { signIn, signUp, verifyOtp, resendOtp } = useAuth();
+  const requestedScreen = getRequestedScreen(params);
+  const requestedEmail = getFirstParam(params.email) || '';
 
-  const [screen, setScreen] = useState<AuthScreen>('signIn');
-  const [email, setEmail] = useState('');
+  const [screen, setScreen] = useState<AuthScreen>(requestedScreen);
+  const [email, setEmail] = useState(requestedEmail);
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [verificationCode, setVerificationCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [resendLoading, setResendLoading] = useState(false);
+
+  useEffect(() => {
+    if (requestedScreen === 'signUp') {
+      setScreen('signUp');
+    }
+
+    if (requestedEmail) {
+      setEmail(requestedEmail);
+    }
+  }, [requestedScreen, requestedEmail]);
 
   const handleSignIn = async () => {
     setError('');

@@ -18,6 +18,18 @@ interface AuthContextType {
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+function buildNameFromAuthUser(authUser: SupabaseUser): string {
+  const meta = (authUser.user_metadata || {}) as Record<string, unknown>;
+  const first = typeof meta.first_name === 'string' ? meta.first_name : '';
+  const last = typeof meta.last_name === 'string' ? meta.last_name : '';
+  const combined = [first, last].filter(Boolean).join(' ').trim();
+  if (combined) return combined;
+  if (typeof meta.full_name === 'string' && meta.full_name.trim()) {
+    return meta.full_name.trim();
+  }
+  return authUser.email || 'User';
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
@@ -28,7 +40,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       if (session?.user) {
-        loadUserProfile(session.user.id);
+        loadUserProfile(session.user);
       } else {
         setLoading(false);
       }
@@ -38,7 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       if (session?.user) {
-        loadUserProfile(session.user.id);
+        loadUserProfile(session.user);
       } else {
         setUser(null);
         setLoading(false);
@@ -60,32 +72,75 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  async function loadUserProfile(userId: string) {
+  async function loadUserProfile(authUser: SupabaseUser) {
+    const fallbackName = buildNameFromAuthUser(authUser);
+    const fallbackUser: User = {
+      id: authUser.id,
+      email: authUser.email || '',
+      name: fallbackName,
+      avatar: undefined,
+    };
+
     try {
       const { data, error } = await supabase
         .from('user_profiles')
         .select('*')
-        .eq('id', userId)
-        .single();
+        .eq('id', authUser.id)
+        .maybeSingle();
 
       if (error) {
         console.error('Error loading user profile:', error);
-        throw error;
       }
 
       if (data) {
-        const fullName = [data.first_name, data.last_name].filter(Boolean).join(' ') || 'User';
+        const fullName = [data.first_name, data.last_name].filter(Boolean).join(' ').trim() || fallbackName;
         setUser({
           id: data.id,
-          email: data.email,
+          email: data.email || authUser.email || '',
           name: fullName,
           avatar: undefined,
         });
+        return;
       }
+
+      // No profile row yet — e.g. a brand-new recipient who just signed up from
+      // an invite link, or an account whose creation trigger didn't run.
+      // Create it so the account behaves identically on every device.
+      await ensureUserProfile(authUser);
+      setUser(fallbackUser);
     } catch (error) {
       console.error('Error loading user profile:', error);
+      // Never block a valid session on profile issues. Falling back to the auth
+      // user guarantees the inbox/cards still load (they only need id + email).
+      setUser(fallbackUser);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function ensureUserProfile(authUser: SupabaseUser) {
+    const meta = (authUser.user_metadata || {}) as Record<string, unknown>;
+    const firstName = typeof meta.first_name === 'string' ? meta.first_name : '';
+    const lastName = typeof meta.last_name === 'string' ? meta.last_name : '';
+
+    try {
+      const { error } = await supabase
+        .from('user_profiles')
+        .upsert(
+          {
+            id: authUser.id,
+            email: authUser.email,
+            first_name: firstName,
+            last_name: lastName,
+          },
+          { onConflict: 'id' }
+        );
+
+      if (error) {
+        console.warn('Could not create user profile row:', error.message);
+      }
+    } catch (error) {
+      console.warn('Could not create user profile row:', error);
     }
   }
 
