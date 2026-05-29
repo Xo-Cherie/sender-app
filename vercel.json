@@ -15,6 +15,22 @@
       "destination": "/auth/callback.html"
     },
     {
+      "source": "/device",
+      "destination": "/device/index.html"
+    },
+    {
+      "source": "/device/login",
+      "destination": "/device/login.html"
+    },
+    {
+      "source": "/device/inbox",
+      "destination": "/device/inbox.html"
+    },
+    {
+      "source": "/device/card/:id",
+      "destination": "/device/card/[id].html"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
