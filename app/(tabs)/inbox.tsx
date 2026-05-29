@@ -22,6 +22,7 @@ export default function InboxScreen() {
   const { receivedCards, loading, refreshCards, deleteReceivedCard } = useCards();
   const [filter, setFilter] = useState<FilterType>('all');
   const [refreshing, setRefreshing] = useState(false);
+  const [lockedCardVisible, setLockedCardVisible] = useState(false);
   const [deviceInfoVisible, setDeviceInfoVisible] = useState(false);
 
   const onRefresh = async () => {
@@ -109,7 +110,7 @@ export default function InboxScreen() {
               <View key={card.id} style={styles.cardWrapper}>
                 <CardPreview
                   card={card}
-                  onPress={() => router.push({ pathname: '/card-detail', params: { id: card.id } })}
+                  onPress={() => setLockedCardVisible(true)}
                 />
                 <Pressable
                   style={styles.deleteButton}
@@ -199,6 +200,34 @@ export default function InboxScreen() {
         </Pressable>
       </Modal>
 
+      {/* Cherie Device Lock Modal */}
+      <Modal
+        visible={lockedCardVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setLockedCardVisible(false)}
+      >
+        <Pressable style={styles.lockOverlay} onPress={() => setLockedCardVisible(false)}>
+          <View style={styles.lockBox}>
+            <View style={styles.lockIconCircle}>
+              <MaterialIcons name="tablet-mac" size={36} color={theme.colors.primary} />
+            </View>
+            <Text style={styles.lockTitle}>Open on Cherie Device</Text>
+            <Text style={styles.lockMessage}>
+              Cards can only be opened and read on your Cherie Device — your dedicated card-receiving display.
+            </Text>
+            <Text style={styles.lockSub}>
+              Sign in to your Cherie Device with this account to view and interact with your cards.
+            </Text>
+            <Pressable
+              style={styles.lockDismiss}
+              onPress={() => setLockedCardVisible(false)}
+            >
+              <Text style={styles.lockDismissText}>Got it</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -456,6 +485,64 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: theme.spacing.lg,
+  },
+  lockOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: theme.spacing.lg,
+  },
+  lockBox: {
+    backgroundColor: theme.colors.white,
+    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing.xl,
+    width: '100%',
+    maxWidth: 340,
+    alignItems: 'center',
+    ...theme.shadows.elevated,
+  },
+  lockIconCircle: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: theme.colors.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: theme.spacing.md,
+  },
+  lockTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: theme.colors.dark,
+    fontFamily: theme.fonts.serif,
+    textAlign: 'center',
+    marginBottom: theme.spacing.sm,
+  },
+  lockMessage: {
+    fontSize: 15,
+    color: theme.colors.charcoal,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: theme.spacing.sm,
+  },
+  lockSub: {
+    fontSize: 13,
+    color: theme.colors.mediumGray,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: theme.spacing.lg,
+  },
+  lockDismiss: {
+    backgroundColor: theme.colors.primary,
+    paddingVertical: theme.spacing.sm + 2,
+    paddingHorizontal: theme.spacing.xl,
+    borderRadius: theme.borderRadius.full,
+  },
+  lockDismissText: {
+    color: theme.colors.white,
+    fontSize: 15,
+    fontWeight: '700',
   },
   fab: {
     position: 'absolute',

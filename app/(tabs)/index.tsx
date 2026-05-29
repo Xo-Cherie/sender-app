@@ -1,10 +1,11 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   Pressable,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -19,6 +20,7 @@ export default function HomeScreen() {
   const { user } = useAuth();
   const { receivedCards, sentCards } = useCards();
 
+  const [lockedCardVisible, setLockedCardVisible] = useState(false);
   const unreadCount = receivedCards.filter(c => !c.isRead).length;
   const firstName = user?.name?.split(' ')[0] || 'there';
 
@@ -204,9 +206,9 @@ export default function HomeScreen() {
                   key={item.id}
                   style={({ pressed }) => [styles.activityRow, pressed && { opacity: 0.75 }]}
                   onPress={() =>
-                    item.viewMode
-                      ? router.push({ pathname: '/card-detail', params: { id: item.cardId, viewMode: item.viewMode } })
-                      : router.push({ pathname: '/card-detail', params: { id: item.cardId } })
+                    item.viewMode === 'sent'
+                      ? router.push({ pathname: '/card-detail', params: { id: item.cardId, viewMode: 'sent' } })
+                      : setLockedCardVisible(true)
                   }
                 >
                   {/* Thumbnail */}
@@ -241,6 +243,26 @@ export default function HomeScreen() {
           </View>
         )}
       </ScrollView>
+      {/* Cherie Device Lock Modal */}
+      <Modal
+        visible={lockedCardVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setLockedCardVisible(false)}
+      >
+        <Pressable style={styles.lockOverlay} onPress={() => setLockedCardVisible(false)}>
+          <View style={styles.lockBox}>
+            <MaterialIcons name="tablet-mac" size={36} color={theme.colors.primary} style={{ marginBottom: 12 }} />
+            <Text style={styles.lockTitle}>Open on Cherie Device</Text>
+            <Text style={styles.lockMessage}>
+              Cards can only be opened and read on your Cherie Device — your dedicated card-receiving display.
+            </Text>
+            <Pressable style={styles.lockDismiss} onPress={() => setLockedCardVisible(false)}>
+              <Text style={styles.lockDismissText}>Got it</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -464,6 +486,48 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: theme.colors.mediumGray,
     fontWeight: '500',
+  },
+  lockOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: theme.spacing.lg,
+  },
+  lockBox: {
+    backgroundColor: theme.colors.white,
+    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing.xl,
+    width: '100%',
+    maxWidth: 340,
+    alignItems: 'center',
+    ...theme.shadows.elevated,
+  },
+  lockTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: theme.colors.dark,
+    fontFamily: theme.fonts.serif,
+    textAlign: 'center',
+    marginBottom: theme.spacing.sm,
+  },
+  lockMessage: {
+    fontSize: 14,
+    color: theme.colors.charcoal,
+    textAlign: 'center',
+    lineHeight: 21,
+    marginBottom: theme.spacing.lg,
+  },
+  lockDismiss: {
+    backgroundColor: theme.colors.primary,
+    paddingVertical: theme.spacing.sm + 2,
+    paddingHorizontal: theme.spacing.xl,
+    borderRadius: theme.borderRadius.full,
+  },
+  lockDismissText: {
+    color: theme.colors.white,
+    fontSize: 15,
+    fontWeight: '700',
   },
   featureBanner: {
     flexDirection: 'row',
