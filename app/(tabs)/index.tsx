@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { theme } from '@/constants/theme';
 import { useAuth } from '@/hooks/useAuth';
 import { useCards } from '@/hooks/useCards';
+import { CardImage } from '@/components/cards/CardImage';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -20,6 +21,61 @@ export default function HomeScreen() {
 
   const unreadCount = receivedCards.filter(c => !c.isRead).length;
   const firstName = user?.name?.split(' ')[0] || 'there';
+
+  type ActivityItem = {
+    id: string;
+    type: 'sent' | 'received' | 'xo';
+    label: string;
+    sublabel: string;
+    date: string;
+    frontImage: any;
+    cardId: string;
+    viewMode?: string;
+  };
+
+  const activityFeed = useMemo<ActivityItem[]>(() => {
+    const items: ActivityItem[] = [];
+
+    sentCards.forEach(card => {
+      items.push({
+        id: `sent-${card.id}`,
+        type: 'sent',
+        label: `You sent a card`,
+        sublabel: `To ${card.recipientNames[0] || 'recipient'}`,
+        date: card.createdAt,
+        frontImage: card.frontImage,
+        cardId: card.id,
+        viewMode: 'sent',
+      });
+    });
+
+    receivedCards.forEach(card => {
+      items.push({
+        id: `received-${card.id}`,
+        type: 'received',
+        label: `Card from ${card.senderName}`,
+        sublabel: card.isRead ? 'Opened' : 'New',
+        date: card.createdAt,
+        frontImage: card.frontImage,
+        cardId: card.id,
+      });
+      if (card.isXod && card.xodAt) {
+        items.push({
+          id: `xo-${card.id}`,
+          type: 'xo',
+          label: `You sent Xo`,
+          sublabel: `To ${card.senderName}`,
+          date: card.xodAt,
+          frontImage: card.frontImage,
+          cardId: card.id,
+        });
+      }
+    });
+
+    return items
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, 10);
+  }, [sentCards, receivedCards]);
 
   const quickActions = [
     {
@@ -137,6 +193,53 @@ export default function HomeScreen() {
             Every card is a permanent keepsake — cherished forever
           </Text>
         </View>
+
+        {/* Recent Activity */}
+        {activityFeed.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Recent Activity</Text>
+            <View style={styles.activityList}>
+              {activityFeed.map(item => (
+                <Pressable
+                  key={item.id}
+                  style={({ pressed }) => [styles.activityRow, pressed && { opacity: 0.75 }]}
+                  onPress={() =>
+                    item.viewMode
+                      ? router.push({ pathname: '/card-detail', params: { id: item.cardId, viewMode: item.viewMode } })
+                      : router.push({ pathname: '/card-detail', params: { id: item.cardId } })
+                  }
+                >
+                  {/* Thumbnail */}
+                  <View style={styles.activityThumb}>
+                    <CardImage source={item.frontImage} style={styles.activityThumbImg} resizeMode="cover" />
+                  </View>
+
+                  {/* Text */}
+                  <View style={styles.activityText}>
+                    <Text style={styles.activityLabel} numberOfLines={1}>{item.label}</Text>
+                    <Text style={styles.activitySublabel} numberOfLines={1}>{item.sublabel}</Text>
+                  </View>
+
+                  {/* Icon + Date */}
+                  <View style={styles.activityMeta}>
+                    <MaterialIcons
+                      name={
+                        item.type === 'sent' ? 'send' :
+                        item.type === 'xo' ? 'favorite' :
+                        item.sublabel === 'Opened' ? 'drafts' : 'mail'
+                      }
+                      size={16}
+                      color={item.type === 'xo' ? theme.colors.primary : theme.colors.mediumGray}
+                    />
+                    <Text style={styles.activityDate}>
+                      {new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </Text>
+                  </View>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -315,6 +418,52 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: theme.colors.dark,
+  },
+  activityList: {
+    gap: theme.spacing.sm,
+  },
+  activityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.white,
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.sm,
+    gap: theme.spacing.sm,
+    ...theme.shadows.card,
+  },
+  activityThumb: {
+    width: 48,
+    height: 60,
+    borderRadius: theme.borderRadius.sm,
+    overflow: 'hidden',
+    flexShrink: 0,
+  },
+  activityThumbImg: {
+    width: 48,
+    height: 60,
+  },
+  activityText: {
+    flex: 1,
+  },
+  activityLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.colors.dark,
+  },
+  activitySublabel: {
+    fontSize: 12,
+    color: theme.colors.mediumGray,
+    marginTop: 2,
+  },
+  activityMeta: {
+    alignItems: 'center',
+    gap: 4,
+    flexShrink: 0,
+  },
+  activityDate: {
+    fontSize: 11,
+    color: theme.colors.mediumGray,
+    fontWeight: '500',
   },
   featureBanner: {
     flexDirection: 'row',
