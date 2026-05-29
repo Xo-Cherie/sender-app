@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, Platform, Modal } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, Platform, Modal, useWindowDimensions } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -24,6 +25,7 @@ export default function CardDetailScreen() {
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
   
   const isSentView = viewMode === 'sent';
+  const { width: screenWidth } = useWindowDimensions();
   const scale = useSharedValue(1);
   const xoAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
@@ -273,6 +275,27 @@ export default function CardDetailScreen() {
           </Text>
         </View>
 
+        {/* Photo Attachments */}
+        {card.mediaAttachments?.filter(a => a.type === 'photo').length > 0 && (() => {
+          const photos = card.mediaAttachments.filter(a => a.type === 'photo');
+          const thumbSize = Math.floor((screenWidth - theme.spacing.lg * 2 - theme.spacing.sm * 2) / 3);
+          return (
+            <View style={styles.photosSection}>
+              <Text style={styles.photosSectionTitle}>Photos</Text>
+              <View style={styles.photosGrid}>
+                {photos.map(photo => (
+                  <ExpoImage
+                    key={photo.id}
+                    source={{ uri: photo.uri }}
+                    style={{ width: thumbSize, height: thumbSize, borderRadius: theme.borderRadius.sm }}
+                    contentFit="cover"
+                  />
+                ))}
+              </View>
+            </View>
+          );
+        })()}
+
         {/* Gift */}
         {card.gift && (
           <View style={styles.giftCard}>
@@ -401,6 +424,21 @@ const styles = StyleSheet.create({
     color: theme.colors.mediumGray,
     textAlign: 'center',
     marginTop: theme.spacing.xs,
+  },
+  photosSection: {
+    paddingHorizontal: theme.spacing.lg,
+    marginBottom: theme.spacing.lg,
+  },
+  photosSectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: theme.colors.dark,
+    marginBottom: theme.spacing.sm,
+  },
+  photosGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.spacing.sm,
   },
   giftCard: {
     backgroundColor: theme.colors.white,

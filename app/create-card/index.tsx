@@ -7,12 +7,17 @@ import {
   Pressable,
   Modal,
   useWindowDimensions,
+  ActivityIndicator,
+  Alert,
+  Platform,
 } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { theme } from '@/constants/theme';
 import { CardImage } from '@/components/cards/CardImage';
+import { pickAndUploadPhotos } from '@/lib/uploadMedia';
 import { cardTemplates, categoryLabels, CardCategory } from '@/constants/cardTemplates';
 import { useFriends } from '@/hooks/useFriends';
 import { useCards } from '@/hooks/useCards';
@@ -48,6 +53,8 @@ export default function CreateCardScreen() {
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [mediaAttachments, setMediaAttachments] = useState<MediaAttachment[]>([]);
+  const [uploadingPhotos, setUploadingPhotos] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState('');
   const [gift, setGift] = useState<Gift | null>(null);
   const [giftAmount, setGiftAmount] = useState('');
 
@@ -83,6 +90,24 @@ export default function CreateCardScreen() {
       setStep(steps[currentIndex - 1]);
     } else {
       router.back();
+    }
+  };
+
+  const handlePickPhotos = async () => {
+    if (!user) return;
+    try {
+      setUploadingPhotos(true);
+      const newAttachments = await pickAndUploadPhotos(user.id, setUploadProgress);
+      setMediaAttachments(prev => [...prev, ...newAttachments]);
+    } catch (error: any) {
+      if (Platform.OS === 'web') {
+        alert(error?.message || 'Failed to upload photos');
+      } else {
+        Alert.alert('Upload failed', error?.message || 'Failed to upload photos');
+      }
+    } finally {
+      setUploadingPhotos(false);
+      setUploadProgress('');
     }
   };
 
@@ -330,13 +355,51 @@ export default function CreateCardScreen() {
           <View style={styles.stepContainer}>
             <Text style={styles.stepTitle}>Add Media (Optional)</Text>
 
-            {/* Photo / Video placeholder */}
-            <Text style={styles.sectionLabel}>Photos &amp; Videos</Text>
-            <Pressable style={styles.uploadCard}>
-              <MaterialIcons name="add-photo-alternate" size={36} color={theme.colors.mediumGray} />
-              <Text style={styles.uploadText}>Tap to add photos or videos</Text>
-              <Text style={styles.uploadLimit}>Max 10MB per photo · 30s per video</Text>
+            {/* Photos */}
+            <Text style={styles.sectionLabel}>Photos</Text>
+            <Pressable
+              style={[styles.uploadCard, uploadingPhotos && styles.uploadCardDisabled]}
+              onPress={handlePickPhotos}
+              disabled={uploadingPhotos}
+            >
+              {uploadingPhotos ? (
+                <>
+                  <ActivityIndicator color={theme.colors.primary} size="large" />
+                  <Text style={styles.uploadText}>{uploadProgress || 'Uploading…'}</Text>
+                </>
+              ) : (
+                <>
+                  <MaterialIcons name="add-photo-alternate" size={36} color={theme.colors.primary} />
+                  <Text style={styles.uploadText}>Tap to add photos</Text>
+                  <Text style={styles.uploadLimit}>Up to 10 photos · 10MB each</Text>
+                </>
+              )}
             </Pressable>
+
+            {/* Photo thumbnails */}
+            {mediaAttachments.filter(a => a.type === 'photo').length > 0 && (
+              <View style={styles.photoGrid}>
+                {mediaAttachments
+                  .filter(a => a.type === 'photo')
+                  .map(attachment => (
+                    <View key={attachment.id} style={styles.photoThumb}>
+                      <ExpoImage
+                        source={{ uri: attachment.uri }}
+                        style={styles.photoThumbImage}
+                        contentFit="cover"
+                      />
+                      <Pressable
+                        style={styles.photoRemove}
+                        onPress={() =>
+                          setMediaAttachments(prev => prev.filter(a => a.id !== attachment.id))
+                        }
+                      >
+                        <MaterialIcons name="close" size={14} color={theme.colors.white} />
+                      </Pressable>
+                    </View>
+                  ))}
+              </View>
+            )}
 
             {/* Voice Memos */}
             <Text style={[styles.sectionLabel, { marginTop: theme.spacing.lg }]}>Voice Memos</Text>
@@ -623,6 +686,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 2,
     borderStyle: 'dashed',
+    borderColor: theme.colors.primary,
+  },
+  uploadCardDisabled: {
     borderColor: theme.colors.lightGray,
   },
   uploadText: {
@@ -635,6 +701,34 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: theme.colors.mediumGray,
     marginTop: theme.spacing.xs,
+  },
+  photoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.spacing.sm,
+    marginTop: theme.spacing.md,
+  },
+  photoThumb: {
+    width: 80,
+    height: 80,
+    borderRadius: theme.borderRadius.sm,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  photoThumbImage: {
+    width: 80,
+    height: 80,
+  },
+  photoRemove: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   voiceHint: {
     fontSize: 13,
