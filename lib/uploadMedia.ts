@@ -1,4 +1,5 @@
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
 import { Platform } from 'react-native';
 import { supabase } from './supabase';
 import type { MediaAttachment } from '@/types';
@@ -57,10 +58,25 @@ async function uploadFileToStorage(
   const contentType = mimeType || (type === 'photo' ? `image/${ext}` : `video/${ext}`);
   const fileName = `${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 
-  // fetch + arrayBuffer works on both web and React Native 0.72+
-  const response = await fetch(uri);
-  if (!response.ok) throw new Error(`Failed to read file: ${response.status}`);
-  const arrayBuffer = await response.arrayBuffer();
+  let arrayBuffer: ArrayBuffer;
+
+  if (Platform.OS === 'web') {
+    // On web, blob URIs work fine with fetch
+    const response = await fetch(uri);
+    if (!response.ok) throw new Error(`Failed to read file: ${response.status}`);
+    arrayBuffer = await response.arrayBuffer();
+  } else {
+    // On native, fetch with file:// URIs can be unreliable — use FileSystem instead
+    const base64 = await FileSystem.readAsStringAsync(uri, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+    const binaryString = atob(base64);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    arrayBuffer = bytes.buffer;
+  }
 
   const { error } = await supabase.storage
     .from(BUCKET)

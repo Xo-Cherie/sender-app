@@ -58,37 +58,63 @@ export function useFriends() {
 
       const allFriends: Friend[] = [];
 
-      // Add received requests (pending only - accepted ones show in friends list)
+      // Received requests
       receivedRequests?.forEach((req: any) => {
-        if (req.user_profiles && req.status === 'pending') {
+        if (!req.user_profiles) return;
+        const name = `${req.user_profiles.first_name || ''} ${req.user_profiles.last_name || ''}`.trim() || req.user_profiles.email;
+        if (req.status === 'pending') {
           allFriends.push({
             id: req.id, // request ID used for accept/reject actions
-            name: `${req.user_profiles.first_name || ''} ${req.user_profiles.last_name || ''}`.trim() || req.user_profiles.email,
+            name,
             email: req.user_profiles.email,
             status: 'pending',
-            userId: req.user_profiles.id, // actual user ID for sending cards
+            userId: req.user_profiles.id,
           });
-        }
-      });
-
-      // Add sent requests (only pending ones, accepted ones will appear in friends list)
-      sentRequests?.forEach((req: any) => {
-        if (req.user_profiles && req.status === 'pending') {
+        } else if (req.status === 'accepted') {
           allFriends.push({
-            id: req.id,
-            name: `${req.user_profiles.first_name || ''} ${req.user_profiles.last_name || ''}`.trim() || req.user_profiles.email,
+            id: req.user_profiles.id,
+            name,
             email: req.user_profiles.email,
-            status: 'sent',
+            status: 'accepted',
             userId: req.user_profiles.id,
           });
         }
       });
 
-      // Add accepted friends
-      acceptedFriends?.forEach((friend: any) => {
-        if (friend.user_profiles) {
+      // Sent requests
+      sentRequests?.forEach((req: any) => {
+        if (!req.user_profiles) return;
+        const name = `${req.user_profiles.first_name || ''} ${req.user_profiles.last_name || ''}`.trim() || req.user_profiles.email;
+        if (req.status === 'pending') {
           allFriends.push({
-            id: friend.user_profiles.id, // Use the actual user profile ID, not the friendship record ID
+            id: req.id,
+            name,
+            email: req.user_profiles.email,
+            status: 'sent',
+            userId: req.user_profiles.id,
+          });
+        } else if (req.status === 'accepted') {
+          // also covered by received side; skip duplicates
+          const alreadyAdded = allFriends.some(f => f.email === req.user_profiles.email && f.status === 'accepted');
+          if (!alreadyAdded) {
+            allFriends.push({
+              id: req.user_profiles.id,
+              name,
+              email: req.user_profiles.email,
+              status: 'accepted',
+              userId: req.user_profiles.id,
+            });
+          }
+        }
+      });
+
+      // Accepted friends from the friends table (legacy / already-migrated rows)
+      acceptedFriends?.forEach((friend: any) => {
+        if (!friend.user_profiles) return;
+        const alreadyAdded = allFriends.some(f => f.email === friend.user_profiles.email && f.status === 'accepted');
+        if (!alreadyAdded) {
+          allFriends.push({
+            id: friend.user_profiles.id,
             name: `${friend.user_profiles.first_name || ''} ${friend.user_profiles.last_name || ''}`.trim() || friend.user_profiles.email,
             email: friend.user_profiles.email,
             status: 'accepted',
@@ -219,38 +245,17 @@ export function useFriends() {
     if (!user) return;
 
     try {
-      // Get the request details
-      const { data: request, error: fetchError } = await supabase
+      // Update status to 'accepted' — only needs UPDATE permission where to_user_id = auth.uid()
+      // Avoids inserting rows on behalf of another user (which fails RLS on the friends table)
+      const { error } = await supabase
         .from('friend_requests')
-        .select('from_user_id, to_user_id')
+        .update({ status: 'accepted' })
         .eq('id', requestId)
-        .single();
+        .eq('to_user_id', user.id);
 
-      if (fetchError) {
-        console.error('Failed to fetch friend request:', fetchError);
+      if (error) {
+        console.error('Failed to accept friend request:', error);
         return;
-      }
-
-      if (!request) return;
-
-      const { error: friendsError } = await supabase.from('friends').insert([
-        { user_id: request.to_user_id, friend_id: request.from_user_id },
-        { user_id: request.from_user_id, friend_id: request.to_user_id },
-      ]);
-
-      if (friendsError) {
-        console.error('Failed to create friendship:', friendsError);
-        return;
-      }
-
-      // Delete the friend request (no longer needed)
-      const { error: deleteError } = await supabase
-        .from('friend_requests')
-        .delete()
-        .eq('id', requestId);
-
-      if (deleteError) {
-        console.error('Failed to delete friend request:', deleteError);
       }
 
       await loadFriends();
