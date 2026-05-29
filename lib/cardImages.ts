@@ -38,6 +38,12 @@ export function normalizeCardFrontImage(value: unknown): CardImageValue {
     return value;
   }
 
+  // On web with Metro static output, require() returns {uri, width, height} instead of a number.
+  if (typeof value === 'object' && value !== null && 'uri' in value) {
+    const uri = (value as { uri: unknown }).uri;
+    if (typeof uri === 'string' && uri) return uri;
+  }
+
   if (typeof value !== 'string' || !value) {
     return '';
   }
