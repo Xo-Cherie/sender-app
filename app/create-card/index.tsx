@@ -475,8 +475,12 @@ export default function CreateCardScreen() {
               <Text style={styles.previewValue}>{senderDisplayName || user?.name || user?.email || 'You'}</Text>
               <Text style={[styles.previewLabel, { marginTop: theme.spacing.md }]}>To:</Text>
               <Text style={styles.previewValue}>
-                {selectedRecipients.map(id => friends.find(f => f.id === id)?.name).join(', ')}
-                {customEmail && ` ${customEmail}`}
+                {recipientDisplayName ||
+                  [
+                    ...selectedRecipients.map(id => friends.find(f => f.id === id)?.name).filter(Boolean),
+                    ...(customEmail ? [customEmail] : []),
+                  ].join(', ') ||
+                  'Recipient'}
               </Text>
               {gift && (
                 <>
