@@ -11,7 +11,7 @@ export default function DeviceIndex() {
   useEffect(() => {
     if (loading) return;
     if (user) {
-      router.replace('/device/inbox');
+      router.replace('/device/home');
     } else {
       router.replace('/device/login');
     }

@@ -7,8 +7,6 @@ import {
   ScrollView,
   ActivityIndicator,
   useWindowDimensions,
-  Alert,
-  Platform,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -32,7 +30,7 @@ export default function DeviceCardViewer() {
   const router = useRouter();
   const { user } = useAuth();
   const { markAsRead, togglePin, sendXo } = useCards();
-  const { width, height } = useWindowDimensions();
+  const { width } = useWindowDimensions();
 
   const [card, setCard] = useState<ReceivedCard | null>(null);
   const [loading, setLoading] = useState(true);
@@ -40,13 +38,12 @@ export default function DeviceCardViewer() {
   const [xoSent, setXoSent] = useState(false);
   const [pinned, setPinned] = useState(false);
 
-  // Flip animation
   const rotation = useSharedValue(0);
   const xoScale = useSharedValue(1);
 
-  // Card dimensions — portrait ratio, responsive
-  const maxCardWidth = Math.min(width * 0.55, 480);
-  const cardWidth = maxCardWidth;
+  // Responsive: full width on mobile, capped on desktop
+  const isDesktop = width >= 900;
+  const cardWidth = isDesktop ? Math.min(width * 0.38, 440) : width - 48;
   const cardHeight = Math.floor(cardWidth * 1.4);
 
   const frontStyle = useAnimatedStyle(() => ({
@@ -81,10 +78,7 @@ export default function DeviceCardViewer() {
       if (!rc) throw new Error('Card not found');
 
       const { data: cardData } = await supabase
-        .from('cards')
-        .select('*')
-        .eq('id', rc.card_id)
-        .single();
+        .from('cards').select('*').eq('id', rc.card_id).single();
 
       if (!cardData) throw new Error('Card data not found');
 
@@ -123,7 +117,6 @@ export default function DeviceCardViewer() {
       setXoSent(!!rc.acknowledged_at);
       setPinned(rc.is_pinned || false);
 
-      // Mark as read
       if (!rc.is_read) markAsRead(id).catch(console.error);
     } catch (err) {
       console.error('Failed to load card:', err);
@@ -147,7 +140,8 @@ export default function DeviceCardViewer() {
 
   async function handlePin() {
     if (!card) return;
-    setPinned(p => !p);
+    const next = !pinned;
+    setPinned(next);
     await togglePin(card.id).catch(console.error);
   }
 
@@ -168,8 +162,8 @@ export default function DeviceCardViewer() {
         <View style={styles.centered}>
           <MaterialIcons name="error-outline" size={48} color={theme.colors.mediumGray} />
           <Text style={styles.errorText}>Card not found</Text>
-          <Pressable style={styles.backBtn} onPress={() => router.back()}>
-            <Text style={styles.backBtnText}>Go back</Text>
+          <Pressable style={styles.goBackBtn} onPress={() => router.back()}>
+            <Text style={styles.goBackText}>Go back</Text>
           </Pressable>
         </View>
       </View>
@@ -184,53 +178,70 @@ export default function DeviceCardViewer() {
     <View style={styles.page}>
       {/* Top bar */}
       <View style={styles.topBar}>
-        <Pressable style={styles.backPressable} onPress={() => router.back()}>
+        <Pressable style={styles.backRow} onPress={() => router.back()}>
           <MaterialIcons name="arrow-back" size={22} color={theme.colors.dark} />
           <Text style={styles.backLabel}>All Cards</Text>
         </Pressable>
-        <View style={styles.topBarRight}>
-          <Text style={styles.topBarSender}>From {card.senderName}</Text>
-          <Text style={styles.topBarDate}>
+        <View style={styles.topMeta}>
+          <Text style={styles.topSender}>From {card.senderName}</Text>
+          <Text style={styles.topDate}>
             {new Date(card.createdAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
           </Text>
         </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <View style={styles.content}>
+        {/* Layout: side-by-side on desktop, stacked on mobile */}
+        <View style={[styles.content, !isDesktop && styles.contentMobile]}>
 
-          {/* Left: Card flip */}
-          <View style={styles.cardSide}>
-            <Text style={styles.tapHint}>{isFlipped ? 'Tap card to see front' : 'Tap card to read message'}</Text>
-            <Pressable onPress={handleFlip} style={[styles.flipContainer, { width: cardWidth, height: cardHeight }]}>
+          {/* Card flip */}
+          <View style={styles.cardSection}>
+            <Text style={styles.tapHint}>
+              {isFlipped ? 'Tap card to see front' : 'Tap card to read message'}
+            </Text>
+
+            <Pressable onPress={handleFlip} style={[styles.flipWrap, { width: cardWidth, height: cardHeight }]}>
               {/* Front */}
               <Animated.View style={[styles.face, { width: cardWidth, height: cardHeight }, frontStyle]}>
                 {imageSource ? (
-                  <ExpoImage source={imageSource} style={{ width: cardWidth, height: cardHeight, borderRadius: theme.borderRadius.lg }} contentFit="cover" />
+                  <ExpoImage
+                    source={imageSource}
+                    style={{ width: cardWidth, height: cardHeight, borderRadius: theme.borderRadius.lg }}
+                    contentFit="cover"
+                  />
                 ) : (
-                  <View style={[styles.imagePlaceholder, { width: cardWidth, height: cardHeight }]}>
+                  <View style={[styles.placeholder, { width: cardWidth, height: cardHeight }]}>
                     <MaterialIcons name="photo" size={48} color={theme.colors.lightGray} />
                   </View>
                 )}
               </Animated.View>
 
               {/* Back */}
-              <Animated.View style={[styles.face, styles.back, { width: cardWidth, height: cardHeight }, backStyle]}>
+              <Animated.View style={[styles.face, styles.backFace, { width: cardWidth, height: cardHeight }, backStyle]}>
                 <View style={styles.backInner}>
                   <Text style={styles.backTo}>To: {card.recipientNames[0] || 'You'}</Text>
-                  <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
+                  <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }} nestedScrollEnabled>
                     <Text style={styles.backMessage}>{card.personalMessage}</Text>
                   </ScrollView>
                   <Text style={styles.backSig}>— {card.senderName}</Text>
                 </View>
               </Animated.View>
             </Pressable>
+
+            {/* Message shown below card on mobile for easy reading */}
+            {!isDesktop && card.personalMessage ? (
+              <View style={styles.messageBox}>
+                <Text style={styles.messageBoxLabel}>Message</Text>
+                <Text style={styles.messageBoxText}>{card.personalMessage}</Text>
+                <Text style={styles.messageBoxSig}>— {card.senderName}</Text>
+              </View>
+            ) : null}
           </View>
 
-          {/* Right: Actions + details */}
-          <View style={styles.rightSide}>
+          {/* Actions */}
+          <View style={[styles.actions, !isDesktop && styles.actionsMobile]}>
 
-            {/* Xo button */}
+            {/* Xo */}
             <Animated.View style={xoAnimStyle}>
               <Pressable
                 style={[styles.xoBtn, xoSent && styles.xoBtnActive]}
@@ -239,7 +250,7 @@ export default function DeviceCardViewer() {
               >
                 <MaterialIcons
                   name={xoSent ? 'favorite' : 'favorite-border'}
-                  size={28}
+                  size={26}
                   color={xoSent ? theme.colors.white : theme.colors.primary}
                 />
                 <Text style={[styles.xoBtnText, xoSent && styles.xoBtnTextActive]}>
@@ -248,13 +259,22 @@ export default function DeviceCardViewer() {
               </Pressable>
             </Animated.View>
 
-            {/* Pin */}
+            {/* Pin / Keepsake */}
             <Pressable style={[styles.actionBtn, pinned && styles.actionBtnActive]} onPress={handlePin}>
-              <MaterialIcons name="push-pin" size={20} color={pinned ? theme.colors.white : theme.colors.dark} />
+              <MaterialIcons name="bookmark" size={20} color={pinned ? theme.colors.white : theme.colors.dark} />
               <Text style={[styles.actionBtnText, pinned && styles.actionBtnTextActive]}>
-                {pinned ? 'Pinned' : 'Pin Card'}
+                {pinned ? 'Saved to Keepsakes ✓' : 'Save to Keepsakes'}
               </Text>
             </Pressable>
+
+            {/* Message on desktop */}
+            {isDesktop && card.personalMessage ? (
+              <View style={styles.messageBox}>
+                <Text style={styles.messageBoxLabel}>Message</Text>
+                <Text style={styles.messageBoxText}>{card.personalMessage}</Text>
+                <Text style={styles.messageBoxSig}>— {card.senderName}</Text>
+              </View>
+            ) : null}
 
             {/* Gift */}
             {card.gift && (
@@ -269,35 +289,30 @@ export default function DeviceCardViewer() {
             {/* Photos */}
             {photos.length > 0 && (
               <View style={styles.photosBox}>
-                <Text style={styles.photosSectionTitle}>Photos</Text>
+                <Text style={styles.photosTitle}>Photos</Text>
                 <View style={styles.photosGrid}>
                   {photos.map(photo => (
-                    <ExpoImage
-                      key={photo.id}
-                      source={{ uri: photo.uri }}
-                      style={styles.photoThumb}
-                      contentFit="cover"
-                    />
+                    <ExpoImage key={photo.id} source={{ uri: photo.uri }} style={styles.photoThumb} contentFit="cover" />
                   ))}
                 </View>
               </View>
             )}
 
-            {/* Card info */}
+            {/* Info */}
             <View style={styles.infoBox}>
               <View style={styles.infoRow}>
-                <MaterialIcons name="person" size={16} color={theme.colors.mediumGray} />
+                <MaterialIcons name="person" size={15} color={theme.colors.mediumGray} />
                 <Text style={styles.infoText}>From {card.senderName}</Text>
               </View>
               <View style={styles.infoRow}>
-                <MaterialIcons name="schedule" size={16} color={theme.colors.mediumGray} />
+                <MaterialIcons name="schedule" size={15} color={theme.colors.mediumGray} />
                 <Text style={styles.infoText}>
                   {new Date(card.createdAt).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
                 </Text>
               </View>
-              {card.isXod && (
+              {xoSent && (
                 <View style={styles.infoRow}>
-                  <MaterialIcons name="favorite" size={16} color={theme.colors.primary} />
+                  <MaterialIcons name="favorite" size={15} color={theme.colors.primary} />
                   <Text style={[styles.infoText, { color: theme.colors.primary }]}>You sent Xo</Text>
                 </View>
               )}
@@ -312,86 +327,67 @@ export default function DeviceCardViewer() {
 const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: theme.colors.cream },
   topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     backgroundColor: theme.colors.white,
-    paddingHorizontal: 32,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.lightGray,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
+    paddingHorizontal: 24, paddingVertical: 14,
+    borderBottomWidth: 1, borderBottomColor: theme.colors.lightGray,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 8, elevation: 2,
   },
-  backPressable: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  backRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   backLabel: { fontSize: 15, fontWeight: '600', color: theme.colors.dark },
-  topBarRight: { alignItems: 'flex-end' },
-  topBarSender: { fontSize: 15, fontWeight: '700', color: theme.colors.dark, fontFamily: theme.fonts.serif },
-  topBarDate: { fontSize: 13, color: theme.colors.mediumGray, marginTop: 2 },
+  topMeta: { alignItems: 'flex-end' },
+  topSender: { fontSize: 15, fontWeight: '700', color: theme.colors.dark, fontFamily: theme.fonts.serif },
+  topDate: { fontSize: 12, color: theme.colors.mediumGray, marginTop: 2 },
   scroll: { flexGrow: 1 },
   content: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 48,
-    padding: 48,
-    justifyContent: 'center',
-    alignItems: 'flex-start',
+    flexDirection: 'row', flexWrap: 'nowrap',
+    gap: 40, padding: 32,
+    justifyContent: 'center', alignItems: 'flex-start',
   },
-  cardSide: { alignItems: 'center' },
-  tapHint: { fontSize: 13, color: theme.colors.mediumGray, marginBottom: 16, fontStyle: 'italic' },
-  flipContainer: { position: 'relative' },
+  contentMobile: { flexDirection: 'column', alignItems: 'center', padding: 24, gap: 24 },
+  cardSection: { alignItems: 'center' },
+  tapHint: { fontSize: 13, color: theme.colors.mediumGray, marginBottom: 12, fontStyle: 'italic' },
+  flipWrap: { position: 'relative' },
   face: {
     position: 'absolute',
     borderRadius: theme.borderRadius.lg,
     overflow: 'hidden',
     backfaceVisibility: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 24,
-    elevation: 10,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 24, elevation: 10,
   },
-  back: { backgroundColor: theme.colors.cream },
-  backInner: { flex: 1, padding: 28, justifyContent: 'center' },
-  backTo: { fontSize: 13, fontWeight: '600', color: theme.colors.mediumGray, marginBottom: 20 },
-  backMessage: {
-    fontSize: 20,
-    lineHeight: 32,
-    color: theme.colors.dark,
-    fontFamily: theme.fonts.serif,
-    textAlign: 'center',
-    flex: 1,
-  },
-  backSig: { fontSize: 20, color: theme.colors.primary, fontStyle: 'italic', textAlign: 'right', marginTop: 20 },
-  imagePlaceholder: { backgroundColor: theme.colors.creamDark, alignItems: 'center', justifyContent: 'center', borderRadius: theme.borderRadius.lg },
-  rightSide: { flex: 1, minWidth: 260, maxWidth: 360, gap: 16 },
-  xoBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
+  backFace: { backgroundColor: theme.colors.cream },
+  backInner: { flex: 1, padding: 24, justifyContent: 'space-between' },
+  backTo: { fontSize: 13, fontWeight: '600', color: theme.colors.mediumGray, marginBottom: 16 },
+  backMessage: { fontSize: 18, lineHeight: 30, color: theme.colors.dark, fontFamily: theme.fonts.serif, textAlign: 'center' },
+  backSig: { fontSize: 18, color: theme.colors.primary, fontStyle: 'italic', textAlign: 'right', marginTop: 16 },
+  placeholder: { backgroundColor: theme.colors.creamDark, alignItems: 'center', justifyContent: 'center', borderRadius: theme.borderRadius.lg },
+  // Message box shown separately for full readability
+  messageBox: {
+    marginTop: 20,
     backgroundColor: theme.colors.white,
-    borderWidth: 2,
-    borderColor: theme.colors.primary,
-    borderRadius: theme.borderRadius.full,
-    paddingVertical: 16,
-    paddingHorizontal: 28,
-    shadowColor: theme.colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 4,
+    borderRadius: theme.borderRadius.lg,
+    padding: 20,
+    width: '100%',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 10, elevation: 2,
+  },
+  messageBoxLabel: { fontSize: 11, fontWeight: '700', color: theme.colors.mediumGray, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 },
+  messageBoxText: { fontSize: 18, lineHeight: 30, color: theme.colors.dark, fontFamily: theme.fonts.serif },
+  messageBoxSig: { fontSize: 16, color: theme.colors.primary, fontStyle: 'italic', textAlign: 'right', marginTop: 14 },
+  // Actions
+  actions: { flex: 1, minWidth: 260, maxWidth: 360, gap: 14 },
+  actionsMobile: { width: '100%', maxWidth: '100%' },
+  xoBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
+    backgroundColor: theme.colors.white, borderWidth: 2, borderColor: theme.colors.primary,
+    borderRadius: theme.borderRadius.full, paddingVertical: 16,
+    shadowColor: theme.colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 4,
   },
   xoBtnActive: { backgroundColor: theme.colors.primary },
   xoBtnText: { fontSize: 17, fontWeight: '700', color: theme.colors.primary },
   xoBtnTextActive: { color: theme.colors.white },
   actionBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
-    backgroundColor: theme.colors.white,
-    borderRadius: theme.borderRadius.md,
+    backgroundColor: theme.colors.white, borderRadius: theme.borderRadius.md,
     paddingVertical: 14, paddingHorizontal: 20,
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 10, elevation: 2,
   },
@@ -399,29 +395,22 @@ const styles = StyleSheet.create({
   actionBtnText: { fontSize: 15, fontWeight: '600', color: theme.colors.dark },
   actionBtnTextActive: { color: theme.colors.white },
   giftBox: {
-    backgroundColor: theme.colors.white,
-    borderRadius: theme.borderRadius.lg,
-    padding: 20,
-    alignItems: 'center',
+    backgroundColor: theme.colors.white, borderRadius: theme.borderRadius.lg,
+    padding: 20, alignItems: 'center',
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 10, elevation: 2,
   },
   giftTitle: { fontSize: 15, fontWeight: '700', color: theme.colors.dark, marginTop: 8 },
   giftAmount: { fontSize: 32, fontWeight: '700', color: theme.colors.primary, marginVertical: 6 },
   giftMsg: { fontSize: 13, color: theme.colors.mediumGray, textAlign: 'center' },
   photosBox: {
-    backgroundColor: theme.colors.white,
-    borderRadius: theme.borderRadius.lg,
-    padding: 16,
+    backgroundColor: theme.colors.white, borderRadius: theme.borderRadius.lg, padding: 16,
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 10, elevation: 2,
   },
-  photosSectionTitle: { fontSize: 14, fontWeight: '700', color: theme.colors.dark, marginBottom: 10 },
+  photosTitle: { fontSize: 14, fontWeight: '700', color: theme.colors.dark, marginBottom: 10 },
   photosGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   photoThumb: { width: 80, height: 80, borderRadius: theme.borderRadius.sm },
   infoBox: {
-    backgroundColor: theme.colors.white,
-    borderRadius: theme.borderRadius.lg,
-    padding: 16,
-    gap: 10,
+    backgroundColor: theme.colors.white, borderRadius: theme.borderRadius.lg, padding: 16, gap: 10,
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 10, elevation: 2,
   },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
@@ -429,9 +418,9 @@ const styles = StyleSheet.create({
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 48 },
   loadingText: { fontSize: 15, color: theme.colors.mediumGray, marginTop: 16 },
   errorText: { fontSize: 18, fontWeight: '600', color: theme.colors.dark, marginTop: 16 },
-  backBtn: {
+  goBackBtn: {
     marginTop: 20, backgroundColor: theme.colors.primary,
     paddingHorizontal: 24, paddingVertical: 12, borderRadius: theme.borderRadius.full,
   },
-  backBtnText: { color: theme.colors.white, fontWeight: '700', fontSize: 15 },
+  goBackText: { color: theme.colors.white, fontWeight: '700', fontSize: 15 },
 });

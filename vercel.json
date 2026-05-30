@@ -6,33 +6,14 @@
   "cleanUrls": true,
   "trailingSlash": false,
   "rewrites": [
-    {
-      "source": "/create-card",
-      "destination": "/create-card/index.html"
-    },
-    {
-      "source": "/auth/callback",
-      "destination": "/auth/callback.html"
-    },
-    {
-      "source": "/device",
-      "destination": "/device/index.html"
-    },
-    {
-      "source": "/device/login",
-      "destination": "/device/login.html"
-    },
-    {
-      "source": "/device/inbox",
-      "destination": "/device/inbox.html"
-    },
-    {
-      "source": "/device/card/:id",
-      "destination": "/device/card/[id].html"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
-    }
+    { "source": "/create-card", "destination": "/create-card/index.html" },
+    { "source": "/auth/callback", "destination": "/auth/callback.html" },
+    { "source": "/device", "destination": "/device/index.html" },
+    { "source": "/device/login", "destination": "/device/login.html" },
+    { "source": "/device/home", "destination": "/device/home.html" },
+    { "source": "/device/inbox", "destination": "/device/inbox.html" },
+    { "source": "/device/keepsakes", "destination": "/device/keepsakes.html" },
+    { "source": "/device/card/:id", "destination": "/device/card/[id].html" },
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
