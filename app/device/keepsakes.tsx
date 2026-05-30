@@ -46,7 +46,7 @@ export default function DeviceKeepsakes() {
             <MaterialIcons name="bookmark" size={22} color={theme.colors.primary} />
           </View>
           <View>
-            <Text style={styles.headerTitle}>Memory Vault</Text>
+            <Text style={styles.headerTitle}>Keepsakes</Text>
             <Text style={styles.headerSub}>
               {keepsakes.length} saved keepsake{keepsakes.length !== 1 ? 's' : ''}
             </Text>
@@ -76,7 +76,7 @@ export default function DeviceKeepsakes() {
             <View style={styles.emptyIcon}>
               <MaterialIcons name="bookmark-border" size={40} color={theme.colors.primary} />
             </View>
-            <Text style={styles.emptyTitle}>Your Memory Vault is empty</Text>
+            <Text style={styles.emptyTitle}>Your Keepsakes is empty</Text>
             <Text style={styles.emptySub}>
               Open a card and tap "Save to Keepsakes" to preserve it here. Your most cherished cards will live here forever.
             </Text>
@@ -135,7 +135,7 @@ export default function DeviceKeepsakes() {
             </View>
 
             <Text style={styles.footerNote}>
-              These cards are saved forever in your Memory Vault ♥
+              These cards are saved forever in your Keepsakes ♥
             </Text>
           </>
         )}

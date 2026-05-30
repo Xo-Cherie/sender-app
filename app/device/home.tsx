@@ -183,7 +183,7 @@ export default function DeviceHome() {
       {keepsakes.length > 0 && (
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Memory Vault</Text>
+            <Text style={styles.sectionTitle}>Keepsakes</Text>
             <Pressable onPress={() => router.push('/device/keepsakes')}>
               <Text style={styles.seeAll}>See all</Text>
             </Pressable>

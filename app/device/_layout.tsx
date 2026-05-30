@@ -12,7 +12,7 @@ import { theme } from '@/constants/theme';
 const NAV_ITEMS = [
   { path: '/device/home', label: 'Home', icon: 'home' as const },
   { path: '/device/inbox', label: 'Cards', icon: 'inbox' as const },
-  { path: '/device/keepsakes', label: 'Memory Vault', icon: 'bookmark' as const },
+  { path: '/device/keepsakes', label: 'Keepsakes', icon: 'bookmark' as const },
 ];
 
 function DeviceNav() {
