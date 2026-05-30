@@ -228,8 +228,8 @@ export default function DeviceCardViewer() {
               </Animated.View>
             </Pressable>
 
-            {/* Message shown below card on mobile for easy reading */}
-            {!isDesktop && card.personalMessage ? (
+            {/* Message shown below card on mobile only after card is flipped */}
+            {!isDesktop && isFlipped && card.personalMessage ? (
               <View style={styles.messageBox}>
                 <Text style={styles.messageBoxLabel}>Message</Text>
                 <Text style={styles.messageBoxText}>{card.personalMessage}</Text>
@@ -267,8 +267,8 @@ export default function DeviceCardViewer() {
               </Text>
             </Pressable>
 
-            {/* Message on desktop */}
-            {isDesktop && card.personalMessage ? (
+            {/* Message on desktop only after card is flipped */}
+            {isDesktop && isFlipped && card.personalMessage ? (
               <View style={styles.messageBox}>
                 <Text style={styles.messageBoxLabel}>Message</Text>
                 <Text style={styles.messageBoxText}>{card.personalMessage}</Text>
