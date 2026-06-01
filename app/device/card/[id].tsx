@@ -200,7 +200,7 @@ export default function DeviceCardViewer() {
               {isFlipped ? 'Tap card to see front' : 'Tap card to read message'}
             </Text>
 
-            <Pressable onPress={handleFlip} style={[styles.flipWrap, { width: cardWidth, height: cardHeight }]}>
+              <Pressable onPress={handleFlip} style={[styles.flipWrap, { width: cardWidth, height: cardHeight }]}>
               {/* Front */}
               <Animated.View style={[styles.face, { width: cardWidth, height: cardHeight }, frontStyle]}>
                 {imageSource ? (
@@ -220,22 +220,18 @@ export default function DeviceCardViewer() {
               <Animated.View style={[styles.face, styles.backFace, { width: cardWidth, height: cardHeight }, backStyle]}>
                 <View style={styles.backInner}>
                   <Text style={styles.backTo}>To: {card.recipientNames[0] || 'You'}</Text>
-                  <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }} nestedScrollEnabled>
+                  <ScrollView
+                    showsVerticalScrollIndicator={false}
+                    style={styles.backMessageScroll}
+                    contentContainerStyle={styles.backMessageContent}
+                    nestedScrollEnabled
+                  >
                     <Text style={styles.backMessage}>{card.personalMessage}</Text>
                   </ScrollView>
                   <Text style={styles.backSig}>— {card.senderName}</Text>
                 </View>
               </Animated.View>
             </Pressable>
-
-            {/* Message shown below card on mobile only after card is flipped */}
-            {!isDesktop && isFlipped && card.personalMessage ? (
-              <View style={styles.messageBox}>
-                <Text style={styles.messageBoxLabel}>Message</Text>
-                <Text style={styles.messageBoxText}>{card.personalMessage}</Text>
-                <Text style={styles.messageBoxSig}>— {card.senderName}</Text>
-              </View>
-            ) : null}
           </View>
 
           {/* Actions */}
@@ -266,15 +262,6 @@ export default function DeviceCardViewer() {
                 {pinned ? 'Saved to Keepsakes ✓' : 'Save to Keepsakes'}
               </Text>
             </Pressable>
-
-            {/* Message on desktop only after card is flipped */}
-            {isDesktop && isFlipped && card.personalMessage ? (
-              <View style={styles.messageBox}>
-                <Text style={styles.messageBoxLabel}>Message</Text>
-                <Text style={styles.messageBoxText}>{card.personalMessage}</Text>
-                <Text style={styles.messageBoxSig}>— {card.senderName}</Text>
-              </View>
-            ) : null}
 
             {/* Gift */}
             {card.gift && (
@@ -357,22 +344,12 @@ const styles = StyleSheet.create({
   },
   backFace: { backgroundColor: theme.colors.cream },
   backInner: { flex: 1, padding: 24, justifyContent: 'space-between' },
-  backTo: { fontSize: 13, fontWeight: '600', color: theme.colors.mediumGray, marginBottom: 16 },
+  backTo: { fontSize: 22, fontWeight: '700', color: theme.colors.dark, fontFamily: theme.fonts.serif },
+  backMessageScroll: { flex: 1, alignSelf: 'stretch' },
+  backMessageContent: { flexGrow: 1, justifyContent: 'center' },
   backMessage: { fontSize: 18, lineHeight: 30, color: theme.colors.dark, fontFamily: theme.fonts.serif, textAlign: 'center' },
-  backSig: { fontSize: 18, color: theme.colors.primary, fontStyle: 'italic', textAlign: 'right', marginTop: 16 },
+  backSig: { fontSize: 18, color: theme.colors.primary, fontStyle: 'italic', textAlign: 'right' },
   placeholder: { backgroundColor: theme.colors.creamDark, alignItems: 'center', justifyContent: 'center', borderRadius: theme.borderRadius.lg },
-  // Message box shown separately for full readability
-  messageBox: {
-    marginTop: 20,
-    backgroundColor: theme.colors.white,
-    borderRadius: theme.borderRadius.lg,
-    padding: 20,
-    width: '100%',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 10, elevation: 2,
-  },
-  messageBoxLabel: { fontSize: 11, fontWeight: '700', color: theme.colors.mediumGray, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 },
-  messageBoxText: { fontSize: 18, lineHeight: 30, color: theme.colors.dark, fontFamily: theme.fonts.serif },
-  messageBoxSig: { fontSize: 16, color: theme.colors.primary, fontStyle: 'italic', textAlign: 'right', marginTop: 14 },
   // Actions
   actions: { flex: 1, minWidth: 260, maxWidth: 360, gap: 14 },
   actionsMobile: { width: '100%', maxWidth: '100%' },
