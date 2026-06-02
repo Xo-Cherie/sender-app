@@ -9,12 +9,15 @@ import Animated, {
 import { theme } from '@/constants/theme';
 import { CardImage } from '@/components/cards/CardImage';
 import { CardImageValue } from '@/lib/cardImages';
+import type { MediaAttachment } from '@/types';
 
 interface FlipCardProps {
   frontImage: CardImageValue;
   backMessage: string;
   recipientName?: string;
   senderName?: string;
+  mediaAttachments?: MediaAttachment[];
+  onPhotoPress?: (uri: string) => void;
   onPress?: () => void;
   size?: 'small' | 'medium' | 'large';
 }
@@ -32,6 +35,8 @@ export function FlipCard({
   backMessage,
   recipientName,
   senderName,
+  mediaAttachments = [],
+  onPhotoPress,
   onPress,
   size = 'medium',
 }: FlipCardProps) {
@@ -39,6 +44,8 @@ export function FlipCard({
   const rotation = useSharedValue(0);
 
   const { width, height } = sizes[size];
+  const photos = mediaAttachments.filter((attachment) => attachment.type === 'photo');
+  const primaryPhoto = photos[0];
 
 
 
@@ -84,9 +91,24 @@ export function FlipCard({
           {recipientName && (
             <Text style={styles.recipient}>To: {recipientName}</Text>
           )}
-          <Text style={styles.message}>{backMessage}</Text>
+          <View style={styles.backCenter}>
+            <Text style={styles.message}>{backMessage}</Text>
+            {primaryPhoto ? (
+              <Pressable
+                style={styles.cardPhotoWrap}
+                onPress={() => onPhotoPress?.(primaryPhoto.uri)}
+              >
+                <CardImage source={primaryPhoto.uri} style={styles.cardPhoto} resizeMode="cover" />
+                {photos.length > 1 ? (
+                  <View style={styles.photoCountBadge}>
+                    <Text style={styles.photoCountText}>+{photos.length - 1}</Text>
+                  </View>
+                ) : null}
+              </Pressable>
+            ) : null}
+          </View>
           {senderName && (
-            <Text style={styles.signature}>— {senderName}</Text>
+            <Text style={styles.signature}>From: {senderName}</Text>
           )}
         </View>
       </Animated.View>
@@ -119,28 +141,57 @@ const styles = StyleSheet.create({
   },
   backContent: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: 'space-between',
+    alignItems: 'stretch',
   },
   recipient: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: theme.colors.mediumGray,
-    marginBottom: theme.spacing.md,
-    alignSelf: 'flex-start',
+    fontSize: 22,
+    fontWeight: '700',
+    color: theme.colors.dark,
+    fontFamily: theme.fonts.serif,
+  },
+  backCenter: {
+    flex: 1,
+    justifyContent: 'center',
+    gap: theme.spacing.md,
   },
   message: {
-    fontSize: 16,
-    lineHeight: 24,
+    fontSize: 22,
+    lineHeight: 30,
     color: theme.colors.dark,
     textAlign: 'center',
     fontFamily: theme.fonts.serif,
   },
+  cardPhotoWrap: {
+    width: '82%',
+    aspectRatio: 1.15,
+    alignSelf: 'center',
+    borderRadius: theme.borderRadius.md,
+    overflow: 'hidden',
+    backgroundColor: theme.colors.primaryLight,
+  },
+  cardPhoto: {
+    width: '100%',
+    height: '100%',
+  },
+  photoCountBadge: {
+    position: 'absolute',
+    right: 8,
+    bottom: 8,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  photoCountText: {
+    color: theme.colors.white,
+    fontSize: 12,
+    fontWeight: '700',
+  },
   signature: {
-    fontSize: 18,
-    color: theme.colors.primary,
-    marginTop: theme.spacing.lg,
-    fontStyle: 'italic',
-    alignSelf: 'flex-end',
+    fontSize: 22,
+    color: theme.colors.dark,
+    fontFamily: theme.fonts.serif,
+    textAlign: 'right',
   },
 });

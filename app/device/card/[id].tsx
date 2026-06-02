@@ -6,6 +6,7 @@ import {
   Pressable,
   ScrollView,
   ActivityIndicator,
+  Modal,
   useWindowDimensions,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -46,6 +47,7 @@ export default function DeviceCardViewer() {
   const [xoSent, setXoSent] = useState(false);
   const [pinned, setPinned] = useState(false);
   const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null);
+  const [selectedPhotoUri, setSelectedPhotoUri] = useState<string | null>(null);
   const soundRef = useRef<Audio.Sound | null>(null);
 
   const rotation = useSharedValue(0);
@@ -217,6 +219,7 @@ export default function DeviceCardViewer() {
   const frontImage = normalizeCardFrontImage(card.frontImage);
   const imageSource = frontImage ? getCardImageSource(frontImage) : null;
   const photos = card.mediaAttachments?.filter(a => a.type === 'photo') || [];
+  const primaryPhoto = photos[0];
   const voiceMemos = card.mediaAttachments?.filter(a => a.type === 'voice') || [];
 
   return (
@@ -265,15 +268,34 @@ export default function DeviceCardViewer() {
               <Animated.View style={[styles.face, styles.backFace, { width: cardWidth, height: cardHeight }, backStyle]}>
                 <View style={styles.backInner}>
                   <Text style={styles.backTo}>To: {card.recipientNames[0] || 'You'}</Text>
-                  <ScrollView
-                    showsVerticalScrollIndicator={false}
-                    style={styles.backMessageScroll}
-                    contentContainerStyle={styles.backMessageContent}
-                    nestedScrollEnabled
-                  >
-                    <Text style={styles.backMessage}>{card.personalMessage}</Text>
-                  </ScrollView>
-                  <Text style={styles.backSig}>— {card.senderName}</Text>
+                  <View style={styles.backCenter}>
+                    <ScrollView
+                      showsVerticalScrollIndicator={false}
+                      style={styles.backMessageScroll}
+                      contentContainerStyle={styles.backMessageContent}
+                      nestedScrollEnabled
+                    >
+                      <Text style={styles.backMessage}>{card.personalMessage}</Text>
+                    </ScrollView>
+                    {primaryPhoto ? (
+                      <Pressable
+                        style={styles.cardPhotoWrap}
+                        onPress={() => setSelectedPhotoUri(primaryPhoto.uri)}
+                      >
+                        <ExpoImage
+                          source={{ uri: primaryPhoto.uri }}
+                          style={styles.cardPhoto}
+                          contentFit="cover"
+                        />
+                        {photos.length > 1 ? (
+                          <View style={styles.photoCountBadge}>
+                            <Text style={styles.photoCountText}>+{photos.length - 1}</Text>
+                          </View>
+                        ) : null}
+                      </Pressable>
+                    ) : null}
+                  </View>
+                  <Text style={styles.backSig}>From: {card.senderName}</Text>
                 </View>
               </Animated.View>
             </Pressable>
@@ -315,18 +337,6 @@ export default function DeviceCardViewer() {
                 <Text style={styles.giftTitle}>Gift Card Included</Text>
                 <Text style={styles.giftAmount}>${card.gift.amount}</Text>
                 {card.gift.message ? <Text style={styles.giftMsg}>{card.gift.message}</Text> : null}
-              </View>
-            )}
-
-            {/* Photos */}
-            {photos.length > 0 && (
-              <View style={styles.photosBox}>
-                <Text style={styles.photosTitle}>Photos</Text>
-                <View style={styles.photosList}>
-                  {photos.map(photo => (
-                    <ExpoImage key={photo.id} source={{ uri: photo.uri }} style={styles.photoImage} contentFit="cover" />
-                  ))}
-                </View>
               </View>
             )}
 
@@ -382,6 +392,17 @@ export default function DeviceCardViewer() {
           </View>
         </View>
       </ScrollView>
+
+      <Modal visible={!!selectedPhotoUri} transparent animationType="fade">
+        <Pressable style={styles.photoModalOverlay} onPress={() => setSelectedPhotoUri(null)}>
+          {selectedPhotoUri ? (
+            <ExpoImage source={{ uri: selectedPhotoUri }} style={styles.photoModalImage} contentFit="contain" />
+          ) : null}
+          <View style={styles.photoModalClose}>
+            <MaterialIcons name="close" size={24} color={theme.colors.white} />
+          </View>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -420,10 +441,26 @@ const styles = StyleSheet.create({
   backFace: { backgroundColor: theme.colors.cream },
   backInner: { flex: 1, padding: 24, justifyContent: 'space-between' },
   backTo: { fontSize: 22, fontWeight: '700', color: theme.colors.dark, fontFamily: theme.fonts.serif },
-  backMessageScroll: { flex: 1, alignSelf: 'stretch' },
+  backCenter: { flex: 1, alignSelf: 'stretch', justifyContent: 'center', gap: 18 },
+  backMessageScroll: { flexGrow: 0, maxHeight: 180, alignSelf: 'stretch' },
   backMessageContent: { flexGrow: 1, justifyContent: 'center' },
   backMessage: { fontSize: 18, lineHeight: 30, color: theme.colors.dark, fontFamily: theme.fonts.serif, textAlign: 'center' },
-  backSig: { fontSize: 18, color: theme.colors.primary, fontStyle: 'italic', textAlign: 'right' },
+  cardPhotoWrap: {
+    width: '82%',
+    aspectRatio: 1.15,
+    alignSelf: 'center',
+    borderRadius: theme.borderRadius.md,
+    overflow: 'hidden',
+    backgroundColor: theme.colors.primaryLight,
+  },
+  cardPhoto: { width: '100%', height: '100%' },
+  photoCountBadge: {
+    position: 'absolute', right: 8, bottom: 8,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 12, paddingHorizontal: 8, paddingVertical: 4,
+  },
+  photoCountText: { color: theme.colors.white, fontSize: 12, fontWeight: '700' },
+  backSig: { fontSize: 22, color: theme.colors.dark, fontFamily: theme.fonts.serif, textAlign: 'right' },
   placeholder: { backgroundColor: theme.colors.creamDark, alignItems: 'center', justifyContent: 'center', borderRadius: theme.borderRadius.lg },
   // Actions
   actions: { flex: 1, minWidth: 260, maxWidth: 360, gap: 14 },
@@ -454,13 +491,6 @@ const styles = StyleSheet.create({
   giftTitle: { fontSize: 15, fontWeight: '700', color: theme.colors.dark, marginTop: 8 },
   giftAmount: { fontSize: 32, fontWeight: '700', color: theme.colors.primary, marginVertical: 6 },
   giftMsg: { fontSize: 13, color: theme.colors.mediumGray, textAlign: 'center' },
-  photosBox: {
-    backgroundColor: theme.colors.white, borderRadius: theme.borderRadius.lg, padding: 16,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 10, elevation: 2,
-  },
-  photosTitle: { fontSize: 14, fontWeight: '700', color: theme.colors.dark, marginBottom: 10 },
-  photosList: { gap: 12 },
-  photoImage: { width: '100%', height: 220, borderRadius: theme.borderRadius.md },
   voiceBox: {
     backgroundColor: theme.colors.white, borderRadius: theme.borderRadius.lg, padding: 16, gap: 10,
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 10, elevation: 2,
@@ -495,4 +525,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24, paddingVertical: 12, borderRadius: theme.borderRadius.full,
   },
   goBackText: { color: theme.colors.white, fontWeight: '700', fontSize: 15 },
+  photoModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.9)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  photoModalImage: {
+    width: '100%',
+    height: '100%',
+  },
+  photoModalClose: {
+    position: 'absolute',
+    top: 24,
+    right: 24,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });

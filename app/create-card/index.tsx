@@ -497,6 +497,7 @@ export default function CreateCardScreen() {
                 backMessage={personalMessage || selectedTemplate_data.backMessage}
                 recipientName={recipientDisplayName || 'Recipient'}
                 senderName={senderDisplayName || 'You'}
+                mediaAttachments={mediaAttachments}
                 size="large"
               />
             </View>

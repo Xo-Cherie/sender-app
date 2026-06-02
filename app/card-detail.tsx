@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, Platform, Modal, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, Platform, Modal } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -32,10 +32,10 @@ export default function CardDetailScreen() {
   const [xoPressed, setXoPressed] = useState(false);
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
   const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null);
+  const [selectedPhotoUri, setSelectedPhotoUri] = useState<string | null>(null);
   const soundRef = useRef<Audio.Sound | null>(null);
   
   const isSentView = viewMode === 'sent';
-  const { width: screenWidth } = useWindowDimensions();
   const scale = useSharedValue(1);
   const xoAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
@@ -299,6 +299,8 @@ export default function CardDetailScreen() {
             backMessage={displayMessage}
             recipientName={displayRecipientName}
             senderName={displaySenderName}
+            mediaAttachments={card.mediaAttachments}
+            onPhotoPress={setSelectedPhotoUri}
             size="large"
           />
         </View>
@@ -319,33 +321,12 @@ export default function CardDetailScreen() {
           </Text>
         </View>
 
-        {/* Photo Attachments */}
-        {card.mediaAttachments?.filter(a => a.type === 'photo').length > 0 && (() => {
-          const photos = card.mediaAttachments.filter(a => a.type === 'photo');
-          const photoHeight = Math.min(Math.floor((screenWidth - theme.spacing.lg * 2) * 0.7), 360);
-          return (
-            <View style={styles.photosSection}>
-              <Text style={styles.photosSectionTitle}>Photos</Text>
-              <View style={styles.photosList}>
-                {photos.map(photo => (
-                  <ExpoImage
-                    key={photo.id}
-                    source={{ uri: photo.uri }}
-                    style={[styles.photoImage, { height: photoHeight }]}
-                    contentFit="cover"
-                  />
-                ))}
-              </View>
-            </View>
-          );
-        })()}
-
         {/* Voice Memos */}
         {card.mediaAttachments?.filter(a => a.type === 'voice').length > 0 && (() => {
           const voiceMemos = card.mediaAttachments.filter(a => a.type === 'voice');
           return (
             <View style={styles.voiceSection}>
-              <Text style={styles.photosSectionTitle}>Voice Memos</Text>
+              <Text style={styles.mediaSectionTitle}>Voice Memos</Text>
               {voiceMemos.map((voice, index) => {
                 const isPlaying = playingVoiceId === voice.id;
 
@@ -466,6 +447,17 @@ export default function CardDetailScreen() {
           </View>
         </Modal>
       ) : null}
+
+      <Modal visible={!!selectedPhotoUri} transparent animationType="fade">
+        <Pressable style={styles.photoModalOverlay} onPress={() => setSelectedPhotoUri(null)}>
+          {selectedPhotoUri ? (
+            <ExpoImage source={{ uri: selectedPhotoUri }} style={styles.photoModalImage} contentFit="contain" />
+          ) : null}
+          <View style={styles.photoModalClose}>
+            <MaterialIcons name="close" size={24} color={theme.colors.white} />
+          </View>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -502,22 +494,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: theme.spacing.xs,
   },
-  photosSection: {
-    paddingHorizontal: theme.spacing.lg,
-    marginBottom: theme.spacing.lg,
-  },
-  photosSectionTitle: {
+  mediaSectionTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: theme.colors.dark,
     marginBottom: theme.spacing.sm,
-  },
-  photosList: {
-    gap: theme.spacing.md,
-  },
-  photoImage: {
-    width: '100%',
-    borderRadius: theme.borderRadius.md,
   },
   voiceSection: {
     paddingHorizontal: theme.spacing.lg,
@@ -693,5 +674,27 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: theme.colors.dark,
+  },
+  photoModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.9)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  photoModalImage: {
+    width: '100%',
+    height: '100%',
+  },
+  photoModalClose: {
+    position: 'absolute',
+    top: 24,
+    right: 24,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
