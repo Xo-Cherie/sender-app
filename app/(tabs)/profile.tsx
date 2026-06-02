@@ -52,6 +52,7 @@ export default function ProfileScreen() {
   const [avatarUrl, setAvatarUrl] = useState<string | undefined>();
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordResetMode, setPasswordResetMode] = useState(false);
   const [mfaLoading, setMfaLoading] = useState(false);
   const [mfaEnabled, setMfaEnabled] = useState(false);
   const [mfaFactorId, setMfaFactorId] = useState<string | undefined>();
@@ -188,6 +189,18 @@ export default function ProfileScreen() {
     showMessage('2FA Disabled', 'Two-factor authentication has been disabled.');
   };
 
+  const handleStartPasswordReset = () => {
+    setNewPassword('');
+    setConfirmPassword('');
+    setPasswordResetMode(true);
+  };
+
+  const handleCancelPasswordReset = () => {
+    setNewPassword('');
+    setConfirmPassword('');
+    setPasswordResetMode(false);
+  };
+
   const handleSave = async () => {
     const trimmedEmail = email.trim().toLowerCase();
     if (!firstName.trim() || !lastName.trim() || !displayName.trim() || !trimmedEmail) {
@@ -195,7 +208,7 @@ export default function ProfileScreen() {
       return;
     }
 
-    if (newPassword || confirmPassword) {
+    if (passwordResetMode && (newPassword || confirmPassword)) {
       if (newPassword.length < 6) {
         showMessage('Password Too Short', 'New password must be at least 6 characters.');
         return;
@@ -243,11 +256,12 @@ export default function ProfileScreen() {
         if (emailError) throw emailError;
       }
 
-      if (newPassword) {
+      if (passwordResetMode && newPassword) {
         const { error: passwordError } = await supabase.auth.updateUser({ password: newPassword });
         if (passwordError) throw passwordError;
         setNewPassword('');
         setConfirmPassword('');
+        setPasswordResetMode(false);
       }
 
       await refreshUser();
@@ -311,8 +325,40 @@ export default function ProfileScreen() {
 
         <View style={styles.formSection}>
           <SectionTitle icon="settings" title="Account Settings" />
-          <Field label="New Password" value={newPassword} onChangeText={setNewPassword} secureTextEntry placeholder="Leave blank to keep current password" />
-          <Field label="Confirm New Password" value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry />
+          <View style={styles.passwordBox}>
+            <View style={styles.passwordHeader}>
+              <View style={styles.passwordTextWrap}>
+                <Text style={styles.passwordTitle}>Password</Text>
+                <Text style={styles.passwordDescription}>
+                  {passwordResetMode
+                    ? 'Enter a new password, then tap Save Changes.'
+                    : 'Password fields are locked until you choose to reset your password.'}
+                </Text>
+              </View>
+              <Button
+                title={passwordResetMode ? 'Cancel' : 'Reset Password'}
+                onPress={passwordResetMode ? handleCancelPasswordReset : handleStartPasswordReset}
+                variant={passwordResetMode ? 'ghost' : 'outline'}
+                size="small"
+              />
+            </View>
+            <Field
+              label="New Password"
+              value={newPassword}
+              onChangeText={setNewPassword}
+              secureTextEntry
+              editable={passwordResetMode}
+              placeholder={passwordResetMode ? 'Enter new password' : 'Tap Reset Password to edit'}
+            />
+            <Field
+              label="Confirm New Password"
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              secureTextEntry
+              editable={passwordResetMode}
+              placeholder={passwordResetMode ? 'Confirm new password' : 'Tap Reset Password to edit'}
+            />
+          </View>
           <View style={styles.mfaBox}>
             <View style={styles.mfaHeader}>
               <View>
@@ -428,7 +474,7 @@ function Field({ label, style, ...props }: FieldProps) {
       <Text style={styles.fieldLabel}>{label}</Text>
       <TextInput
         {...props}
-        style={[styles.input, style]}
+        style={[styles.input, props.editable === false && styles.inputDisabled, style]}
         placeholderTextColor={theme.colors.mediumGray}
       />
     </View>
@@ -613,6 +659,37 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 15,
     color: theme.colors.dark,
+  },
+  inputDisabled: {
+    opacity: 0.6,
+    color: theme.colors.mediumGray,
+  },
+  passwordBox: {
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.lightGray,
+    paddingTop: theme.spacing.md,
+    marginBottom: theme.spacing.md,
+  },
+  passwordHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: theme.spacing.md,
+    marginBottom: theme.spacing.md,
+  },
+  passwordTextWrap: {
+    flex: 1,
+  },
+  passwordTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: theme.colors.dark,
+  },
+  passwordDescription: {
+    fontSize: 12,
+    color: theme.colors.mediumGray,
+    lineHeight: 17,
+    marginTop: 4,
   },
   toggleRow: {
     flexDirection: 'row',
