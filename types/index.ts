@@ -5,6 +5,19 @@ export interface User {
   email: string;
   name: string;
   avatar?: string;
+  firstName?: string;
+  lastName?: string;
+  displayName?: string;
+  phoneNumber?: string;
+  birthday?: string;
+  gender?: string;
+  location?: string;
+  twoFactorEnabled?: boolean;
+  privacySettings?: {
+    showEmail?: boolean;
+    allowFriendRequests?: boolean;
+    shareBirthday?: boolean;
+  };
 }
 
 export interface Friend {

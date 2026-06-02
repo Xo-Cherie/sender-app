@@ -78,7 +78,7 @@ export default function DeviceKeepsakes() {
             </View>
             <Text style={styles.emptyTitle}>Your Keepsakes is empty</Text>
             <Text style={styles.emptySub}>
-              Open a card and tap "Save to Keepsakes" to preserve it here. Your most cherished cards will live here forever.
+              Open a card and tap &quot;Save to Keepsakes&quot; to preserve it here. Your most cherished cards will live here forever.
             </Text>
             <Pressable style={styles.goToInbox} onPress={() => router.push('/device/inbox')}>
               <Text style={styles.goToInboxText}>Go to My Cards</Text>

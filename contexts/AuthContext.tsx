@@ -14,6 +14,7 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   verifyOtp: (email: string, token: string) => Promise<{ error: string | null }>;
   resendOtp: (email: string) => Promise<{ error: string | null }>;
+  refreshUser: () => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -28,6 +29,20 @@ function buildNameFromAuthUser(authUser: SupabaseUser): string {
     return meta.full_name.trim();
   }
   return authUser.email || 'User';
+}
+
+function getStringField(...values: unknown[]): string | undefined {
+  const value = values.find(item => typeof item === 'string' && item.trim().length > 0);
+  return typeof value === 'string' ? value.trim() : undefined;
+}
+
+function getPrivacySettings(...values: unknown[]): User['privacySettings'] {
+  const value = values.find(item => item && typeof item === 'object') as User['privacySettings'] | undefined;
+  return {
+    showEmail: value?.showEmail ?? false,
+    allowFriendRequests: value?.allowFriendRequests ?? true,
+    shareBirthday: value?.shareBirthday ?? false,
+  };
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -73,12 +88,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   async function loadUserProfile(authUser: SupabaseUser) {
+    const meta = (authUser.user_metadata || {}) as Record<string, unknown>;
     const fallbackName = buildNameFromAuthUser(authUser);
     const fallbackUser: User = {
       id: authUser.id,
       email: authUser.email || '',
-      name: fallbackName,
-      avatar: undefined,
+      name: getStringField(meta.display_name, meta.full_name) || fallbackName,
+      avatar: getStringField(meta.avatar_url),
+      firstName: getStringField(meta.first_name),
+      lastName: getStringField(meta.last_name),
+      displayName: getStringField(meta.display_name),
+      phoneNumber: getStringField(meta.phone_number),
+      birthday: getStringField(meta.birthday),
+      gender: getStringField(meta.gender),
+      location: getStringField(meta.location),
+      twoFactorEnabled: meta.two_factor_enabled === true,
+      privacySettings: getPrivacySettings(meta.privacy_settings),
     };
 
     try {
@@ -93,12 +118,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       if (data) {
-        const fullName = [data.first_name, data.last_name].filter(Boolean).join(' ').trim() || fallbackName;
+        const firstName = getStringField(data.first_name, meta.first_name);
+        const lastName = getStringField(data.last_name, meta.last_name);
+        const displayName = getStringField(data.display_name, meta.display_name);
+        const fullName = displayName || [firstName, lastName].filter(Boolean).join(' ').trim() || fallbackName;
         setUser({
           id: data.id,
           email: data.email || authUser.email || '',
           name: fullName,
-          avatar: undefined,
+          avatar: getStringField(data.avatar_url, meta.avatar_url),
+          firstName,
+          lastName,
+          displayName,
+          phoneNumber: getStringField(data.phone_number, meta.phone_number),
+          birthday: getStringField(data.birthday, meta.birthday),
+          gender: getStringField(data.gender, meta.gender),
+          location: getStringField(data.location, meta.location),
+          twoFactorEnabled: data.two_factor_enabled === true || meta.two_factor_enabled === true,
+          privacySettings: getPrivacySettings(data.privacy_settings, meta.privacy_settings),
         });
         return;
       }
@@ -220,6 +257,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  async function refreshUser() {
+    const { data } = await supabase.auth.getUser();
+    if (data.user) {
+      await loadUserProfile(data.user);
+    }
+  }
+
   return (
     <AuthContext.Provider
       value={{
@@ -231,6 +275,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signOut,
         verifyOtp,
         resendOtp,
+        refreshUser,
       }}
     >
       {children}
