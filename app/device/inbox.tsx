@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -26,23 +26,28 @@ export default function DeviceInbox() {
   const { receivedCards, loading, refreshCards } = useCards();
   const { width } = useWindowDimensions();
   const [filter, setFilter] = useState<Filter>('all');
+  const refreshCardsRef = useRef(refreshCards);
+
+  useEffect(() => {
+    refreshCardsRef.current = refreshCards;
+  }, [refreshCards]);
 
   // Redirect if not signed in
   useEffect(() => {
     if (!user && !loading) {
       router.replace('/device/login');
     }
-  }, [user, loading]);
+  }, [loading, router, user]);
 
   // Real-time subscription for new cards
   useEffect(() => {
     if (!user) return;
     const channel = supabase
-      .channel('device-inbox')
+      .channel(`device-inbox-${user.id}-${Date.now()}-${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'received_cards', filter: `recipient_id=eq.${user.id}` },
-        () => { refreshCards(); }
+        () => { refreshCardsRef.current(); }
       )
       .subscribe();
     return () => { supabase.removeChannel(channel); };

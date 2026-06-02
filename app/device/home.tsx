@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -21,17 +21,26 @@ export default function DeviceHome() {
   const { user } = useAuth();
   const { receivedCards, loading, refreshCards } = useCards();
   const { width } = useWindowDimensions();
+  const refreshCardsRef = useRef(refreshCards);
+
+  useEffect(() => {
+    refreshCardsRef.current = refreshCards;
+  }, [refreshCards]);
 
   useEffect(() => {
     if (!user) router.replace('/device/login');
-  }, [user]);
+  }, [router, user]);
 
   // Real-time new card subscription
   useEffect(() => {
     if (!user) return;
     const channel = supabase
-      .channel('device-home')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'received_cards', filter: `recipient_id=eq.${user.id}` }, () => refreshCards())
+      .channel(`device-home-${user.id}-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'received_cards', filter: `recipient_id=eq.${user.id}` },
+        () => refreshCardsRef.current()
+      )
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [user]);
