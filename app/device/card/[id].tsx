@@ -7,6 +7,8 @@ import {
   ScrollView,
   ActivityIndicator,
   Modal,
+  Alert,
+  Platform,
   useWindowDimensions,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -49,6 +51,7 @@ export default function DeviceCardViewer() {
   const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null);
   const [selectedPhotoUri, setSelectedPhotoUri] = useState<string | null>(null);
   const soundRef = useRef<Audio.Sound | null>(null);
+  const webAudioRef = useRef<HTMLAudioElement | null>(null);
 
   const rotation = useSharedValue(0);
   const xoScale = useSharedValue(1);
@@ -80,6 +83,8 @@ export default function DeviceCardViewer() {
   useEffect(() => {
     return () => {
       soundRef.current?.unloadAsync().catch(() => {});
+      webAudioRef.current?.pause();
+      webAudioRef.current = null;
     };
   }, []);
 
@@ -164,31 +169,72 @@ export default function DeviceCardViewer() {
   }
 
   async function handlePlayVoice(uri: string, voiceId: string) {
-    if (soundRef.current) {
-      await soundRef.current.stopAsync().catch(() => {});
-      await soundRef.current.unloadAsync().catch(() => {});
-      soundRef.current = null;
-    }
+    await stopCurrentVoice();
 
     if (playingVoiceId === voiceId) {
       setPlayingVoiceId(null);
       return;
     }
 
-    const { sound } = await Audio.Sound.createAsync(
-      { uri },
-      { shouldPlay: true },
-      (status) => {
-        if (status.isLoaded && status.didJustFinish) {
+    if (Platform.OS === 'web') {
+      try {
+        const audio = new window.Audio(uri);
+        audio.preload = 'auto';
+        audio.onended = () => {
           setPlayingVoiceId(null);
-          soundRef.current?.unloadAsync().catch(() => {});
-          soundRef.current = null;
-        }
-      }
-    );
+          webAudioRef.current = null;
+        };
+        audio.onerror = () => {
+          setPlayingVoiceId(null);
+          webAudioRef.current = null;
+          alert('Could not play this voice memo. It may need to be re-recorded.');
+        };
 
-    soundRef.current = sound;
-    setPlayingVoiceId(voiceId);
+        webAudioRef.current = audio;
+        setPlayingVoiceId(voiceId);
+        await audio.play();
+      } catch (error) {
+        console.error('Failed to play web voice memo:', error);
+        setPlayingVoiceId(null);
+        webAudioRef.current = null;
+        alert('Could not play this voice memo. Please try again.');
+      }
+      return;
+    }
+
+    try {
+      const { sound } = await Audio.Sound.createAsync(
+        { uri },
+        { shouldPlay: true },
+        (status) => {
+          if (status.isLoaded && status.didJustFinish) {
+            setPlayingVoiceId(null);
+            soundRef.current?.unloadAsync().catch(() => {});
+            soundRef.current = null;
+          }
+        }
+      );
+
+      soundRef.current = sound;
+      setPlayingVoiceId(voiceId);
+    } catch (error) {
+      console.error('Failed to play voice memo:', error);
+      Alert.alert('Error', 'Could not play this voice memo.');
+    }
+  }
+
+  async function stopCurrentVoice() {
+    if (soundRef.current) {
+      await soundRef.current.stopAsync().catch(() => {});
+      await soundRef.current.unloadAsync().catch(() => {});
+      soundRef.current = null;
+    }
+
+    if (webAudioRef.current) {
+      webAudioRef.current.pause();
+      webAudioRef.current.currentTime = 0;
+      webAudioRef.current = null;
+    }
   }
 
   if (loading) {
