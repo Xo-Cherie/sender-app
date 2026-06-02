@@ -48,14 +48,31 @@ export async function pickAndUploadPhotos(
   return attachments;
 }
 
+export async function uploadVoiceMemo(
+  userId: string,
+  uri: string,
+  duration?: number,
+  mimeType?: string
+): Promise<MediaAttachment> {
+  const publicUrl = await uploadFileToStorage(uri, 'voice', userId, mimeType);
+
+  return {
+    id: `voice-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    type: 'voice',
+    uri: publicUrl,
+    size: 0,
+    duration,
+  };
+}
+
 async function uploadFileToStorage(
   uri: string,
-  type: 'photo' | 'video',
+  type: 'photo' | 'video' | 'voice',
   userId: string,
   mimeType?: string | null
 ): Promise<string> {
-  const ext = (uri.split('.').pop() || (type === 'photo' ? 'jpg' : 'mp4')).toLowerCase().split('?')[0];
-  const contentType = mimeType || (type === 'photo' ? `image/${ext}` : `video/${ext}`);
+  const contentType = mimeType || getFallbackContentType(type);
+  const ext = getFileExtension(uri, contentType, type);
   const fileName = `${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 
   let arrayBuffer: ArrayBuffer;
@@ -68,8 +85,8 @@ async function uploadFileToStorage(
   } else {
     // On native, fetch with file:// URIs can be unreliable — use FileSystem instead
     const base64 = await FileSystem.readAsStringAsync(uri, {
-      encoding: FileSystem.EncodingType.Base64,
-    });
+      encoding: 'base64' as any,
+    } as any);
     const binaryString = atob(base64);
     const bytes = new Uint8Array(binaryString.length);
     for (let i = 0; i < binaryString.length; i++) {
@@ -86,4 +103,32 @@ async function uploadFileToStorage(
 
   const { data } = supabase.storage.from(BUCKET).getPublicUrl(fileName);
   return data.publicUrl;
+}
+
+function getFallbackContentType(type: 'photo' | 'video' | 'voice'): string {
+  if (type === 'photo') return 'image/jpeg';
+  if (type === 'video') return 'video/mp4';
+  return Platform.OS === 'web' ? 'audio/webm' : 'audio/m4a';
+}
+
+function getFileExtension(
+  uri: string,
+  contentType: string,
+  type: 'photo' | 'video' | 'voice'
+): string {
+  const fromMime = contentType.split('/')[1]?.split(';')[0]?.trim().toLowerCase();
+  if (fromMime) {
+    if (fromMime === 'jpeg') return 'jpg';
+    if (fromMime === 'mpeg') return 'mp3';
+    return fromMime;
+  }
+
+  const uriExt = uri.split('.').pop()?.toLowerCase().split('?')[0];
+  if (uriExt && /^[a-z0-9]+$/.test(uriExt) && uriExt.length <= 5) {
+    return uriExt;
+  }
+
+  if (type === 'photo') return 'jpg';
+  if (type === 'video') return 'mp4';
+  return Platform.OS === 'web' ? 'webm' : 'm4a';
 }

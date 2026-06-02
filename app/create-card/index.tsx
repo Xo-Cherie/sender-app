@@ -17,7 +17,7 @@ import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { theme } from '@/constants/theme';
 import { CardImage } from '@/components/cards/CardImage';
-import { pickAndUploadPhotos } from '@/lib/uploadMedia';
+import { pickAndUploadPhotos, uploadVoiceMemo } from '@/lib/uploadMedia';
 import { cardTemplates, categoryLabels, CardCategory } from '@/constants/cardTemplates';
 import { useFriends } from '@/hooks/useFriends';
 import { useCards } from '@/hooks/useCards';
@@ -54,6 +54,7 @@ export default function CreateCardScreen() {
   const [sent, setSent] = useState(false);
   const [mediaAttachments, setMediaAttachments] = useState<MediaAttachment[]>([]);
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
+  const [uploadingVoice, setUploadingVoice] = useState(false);
   const [uploadProgress, setUploadProgress] = useState('');
   const [gift, setGift] = useState<Gift | null>(null);
   const [giftAmount, setGiftAmount] = useState('');
@@ -107,6 +108,29 @@ export default function CreateCardScreen() {
       }
     } finally {
       setUploadingPhotos(false);
+      setUploadProgress('');
+    }
+  };
+
+  const handleAddVoiceMemo = async (memo: MediaAttachment) => {
+    if (!user) return;
+
+    try {
+      setUploadingVoice(true);
+      setUploadProgress('Uploading voice memo…');
+      const uploadedMemo = await uploadVoiceMemo(user.id, memo.uri, memo.duration, memo.mimeType);
+      setMediaAttachments(prev => [...prev, uploadedMemo]);
+    } catch (error: any) {
+      if (Platform.OS === 'web') {
+        alert(error?.message || 'Failed to upload voice memo');
+      } else {
+        Alert.alert('Upload Failed', error?.message || 'Failed to upload voice memo');
+      }
+    } finally {
+      if (Platform.OS === 'web' && memo.uri.startsWith('blob:')) {
+        URL.revokeObjectURL(memo.uri);
+      }
+      setUploadingVoice(false);
       setUploadProgress('');
     }
   };
@@ -406,9 +430,15 @@ export default function CreateCardScreen() {
             <Text style={styles.voiceHint}>Record up to 3 voice messages (max 60s each)</Text>
             <VoiceMemoRecorder
               memos={mediaAttachments}
-              onAdd={(memo) => setMediaAttachments(prev => [...prev, memo])}
+              onAdd={handleAddVoiceMemo}
               onRemove={(id) => setMediaAttachments(prev => prev.filter(m => m.id !== id))}
             />
+            {uploadingVoice && (
+              <View style={styles.voiceUploading}>
+                <ActivityIndicator color={theme.colors.primary} size="small" />
+                <Text style={styles.voiceUploadingText}>{uploadProgress || 'Uploading voice memo…'}</Text>
+              </View>
+            )}
           </View>
         )}
 
@@ -738,6 +768,17 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: theme.colors.mediumGray,
     marginBottom: theme.spacing.md,
+  },
+  voiceUploading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+    marginTop: theme.spacing.sm,
+  },
+  voiceUploadingText: {
+    fontSize: 13,
+    color: theme.colors.mediumGray,
+    fontWeight: '500',
   },
   previewContainer: {
     alignItems: 'center',

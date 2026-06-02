@@ -19,7 +19,7 @@ function DeviceNav() {
   const router = useRouter();
   const pathname = usePathname();
   const { user, signOut } = useAuth();
-  const unreadCount = useUnreadCount();
+  const { unreadCount } = useUnreadCount();
   const { width } = useWindowDimensions();
   const isDesktop = width >= 768;
 

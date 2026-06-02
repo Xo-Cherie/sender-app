@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Platform, Modal, useWindowDimensions } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
+import { Audio } from 'expo-av';
 import { theme } from '@/constants/theme';
 import { useCards } from '@/hooks/useCards';
 import { useAuth } from '@/hooks/useAuth';
@@ -14,6 +15,13 @@ import { normalizeCardFrontImage, resolveCardFrontImage } from '@/lib/cardImages
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import { Card, ReceivedCard } from '@/types';
 
+function formatMediaTime(seconds?: number): string {
+  const value = Math.max(0, Math.round(seconds || 0));
+  const minutes = Math.floor(value / 60);
+  const remainingSeconds = value % 60;
+  return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+}
+
 export default function CardDetailScreen() {
   const { id, viewMode } = useLocalSearchParams<{ id: string; viewMode?: string }>();
   const router = useRouter();
@@ -23,6 +31,8 @@ export default function CardDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [xoPressed, setXoPressed] = useState(false);
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
+  const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null);
+  const soundRef = useRef<Audio.Sound | null>(null);
   
   const isSentView = viewMode === 'sent';
   const { width: screenWidth } = useWindowDimensions();
@@ -30,6 +40,12 @@ export default function CardDetailScreen() {
   const xoAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
   }));
+
+  useEffect(() => {
+    return () => {
+      soundRef.current?.unloadAsync().catch(() => {});
+    };
+  }, []);
 
   // Load card directly from database
   useEffect(() => {
@@ -245,6 +261,34 @@ export default function CardDetailScreen() {
     }
   };
 
+  const handlePlayVoice = async (uri: string, voiceId: string) => {
+    if (soundRef.current) {
+      await soundRef.current.stopAsync().catch(() => {});
+      await soundRef.current.unloadAsync().catch(() => {});
+      soundRef.current = null;
+    }
+
+    if (playingVoiceId === voiceId) {
+      setPlayingVoiceId(null);
+      return;
+    }
+
+    const { sound } = await Audio.Sound.createAsync(
+      { uri },
+      { shouldPlay: true },
+      (status) => {
+        if (status.isLoaded && status.didJustFinish) {
+          setPlayingVoiceId(null);
+          soundRef.current?.unloadAsync().catch(() => {});
+          soundRef.current = null;
+        }
+      }
+    );
+
+    soundRef.current = sound;
+    setPlayingVoiceId(voiceId);
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
@@ -278,20 +322,53 @@ export default function CardDetailScreen() {
         {/* Photo Attachments */}
         {card.mediaAttachments?.filter(a => a.type === 'photo').length > 0 && (() => {
           const photos = card.mediaAttachments.filter(a => a.type === 'photo');
-          const thumbSize = Math.floor((screenWidth - theme.spacing.lg * 2 - theme.spacing.sm * 2) / 3);
+          const photoHeight = Math.min(Math.floor((screenWidth - theme.spacing.lg * 2) * 0.7), 360);
           return (
             <View style={styles.photosSection}>
               <Text style={styles.photosSectionTitle}>Photos</Text>
-              <View style={styles.photosGrid}>
+              <View style={styles.photosList}>
                 {photos.map(photo => (
                   <ExpoImage
                     key={photo.id}
                     source={{ uri: photo.uri }}
-                    style={{ width: thumbSize, height: thumbSize, borderRadius: theme.borderRadius.sm }}
+                    style={[styles.photoImage, { height: photoHeight }]}
                     contentFit="cover"
                   />
                 ))}
               </View>
+            </View>
+          );
+        })()}
+
+        {/* Voice Memos */}
+        {card.mediaAttachments?.filter(a => a.type === 'voice').length > 0 && (() => {
+          const voiceMemos = card.mediaAttachments.filter(a => a.type === 'voice');
+          return (
+            <View style={styles.voiceSection}>
+              <Text style={styles.photosSectionTitle}>Voice Memos</Text>
+              {voiceMemos.map((voice, index) => {
+                const isPlaying = playingVoiceId === voice.id;
+
+                return (
+                  <Pressable
+                    key={voice.id}
+                    style={styles.voiceRow}
+                    onPress={() => handlePlayVoice(voice.uri, voice.id)}
+                  >
+                    <View style={[styles.voicePlayBtn, isPlaying && styles.voicePlayBtnActive]}>
+                      <MaterialIcons
+                        name={isPlaying ? 'pause' : 'play-arrow'}
+                        size={22}
+                        color={isPlaying ? theme.colors.white : theme.colors.primary}
+                      />
+                    </View>
+                    <View style={styles.voiceInfo}>
+                      <Text style={styles.voiceLabel}>Voice Memo {index + 1}</Text>
+                      <Text style={styles.voiceDuration}>{formatMediaTime(voice.duration)}</Text>
+                    </View>
+                  </Pressable>
+                );
+              })}
             </View>
           );
         })()}
@@ -435,10 +512,50 @@ const styles = StyleSheet.create({
     color: theme.colors.dark,
     marginBottom: theme.spacing.sm,
   },
-  photosGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  photosList: {
+    gap: theme.spacing.md,
+  },
+  photoImage: {
+    width: '100%',
+    borderRadius: theme.borderRadius.md,
+  },
+  voiceSection: {
+    paddingHorizontal: theme.spacing.lg,
+    marginBottom: theme.spacing.lg,
     gap: theme.spacing.sm,
+  },
+  voiceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.md,
+    backgroundColor: theme.colors.white,
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.md,
+    ...theme.shadows.card,
+  },
+  voicePlayBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: theme.colors.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  voicePlayBtnActive: {
+    backgroundColor: theme.colors.primary,
+  },
+  voiceInfo: {
+    flex: 1,
+  },
+  voiceLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: theme.colors.dark,
+  },
+  voiceDuration: {
+    fontSize: 12,
+    color: theme.colors.mediumGray,
+    marginTop: 2,
   },
   giftCard: {
     backgroundColor: theme.colors.white,

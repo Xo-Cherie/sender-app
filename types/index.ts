@@ -22,6 +22,7 @@ export interface MediaAttachment {
   uri: string;
   size: number; // in bytes
   duration?: number; // for videos/voice in seconds
+  mimeType?: string;
 }
 
 export interface Gift {

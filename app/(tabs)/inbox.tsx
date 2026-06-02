@@ -486,13 +486,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: theme.spacing.lg,
   },
-  lockOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: theme.spacing.lg,
-  },
   lockBox: {
     backgroundColor: theme.colors.white,
     borderRadius: theme.borderRadius.lg,

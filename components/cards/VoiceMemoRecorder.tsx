@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, Alert } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Alert, Platform } from 'react-native';
 import { Audio } from 'expo-av';
 import { MaterialIcons } from '@expo/vector-icons';
 import { theme } from '@/constants/theme';
@@ -7,7 +7,7 @@ import { MediaAttachment } from '@/types';
 
 interface VoiceMemoRecorderProps {
   memos: MediaAttachment[];
-  onAdd: (memo: MediaAttachment) => void;
+  onAdd: (memo: MediaAttachment) => void | Promise<void>;
   onRemove: (id: string) => void;
   maxDuration?: number; // seconds, default 60
 }
@@ -30,10 +30,15 @@ export function VoiceMemoRecorder({
   const [elapsed, setElapsed] = useState(0);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [playPosition, setPlayPosition] = useState<Record<string, number>>({});
+  const [webError, setWebError] = useState('');
 
   const recordingRef = useRef<Audio.Recording | null>(null);
+  const webRecorderRef = useRef<MediaRecorder | null>(null);
+  const webStreamRef = useRef<MediaStream | null>(null);
+  const webChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const soundRef = useRef<Audio.Sound | null>(null);
+  const elapsedRef = useRef(0);
 
   useEffect(() => {
     return () => {
@@ -45,10 +50,16 @@ export function VoiceMemoRecorder({
       if (soundRef.current) {
         soundRef.current.unloadAsync().catch(() => {});
       }
+      if (webRecorderRef.current?.state === 'recording') {
+        webRecorderRef.current.stop();
+      }
+      webStreamRef.current?.getTracks().forEach(track => track.stop());
     };
   }, []);
 
   async function requestPermissions(): Promise<boolean> {
+    if (Platform.OS === 'web') return true;
+
     const { status } = await Audio.requestPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert(
@@ -61,10 +72,16 @@ export function VoiceMemoRecorder({
   }
 
   async function startRecording() {
+    setWebError('');
     const granted = await requestPermissions();
     if (!granted) return;
 
     try {
+      if (Platform.OS === 'web') {
+        await startWebRecording();
+        return;
+      }
+
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
@@ -74,31 +91,22 @@ export function VoiceMemoRecorder({
         Audio.RecordingOptionsPresets.HIGH_QUALITY
       );
       recordingRef.current = recording;
-      setRecordState('recording');
-      setElapsed(0);
-
-      timerRef.current = setInterval(() => {
-        setElapsed(prev => {
-          if (prev + 1 >= maxDuration) {
-            stopRecording();
-            return maxDuration;
-          }
-          return prev + 1;
-        });
-      }, 1000);
+      beginRecordingTimer();
     } catch (err) {
       console.error('Failed to start recording:', err);
-      Alert.alert('Error', 'Could not start recording. Please try again.');
+      showError('Could not start recording. Please check microphone permissions and try again.');
     }
   }
 
   async function stopRecording() {
+    if (Platform.OS === 'web') {
+      stopWebRecording();
+      return;
+    }
+
     if (!recordingRef.current) return;
 
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
+    clearRecordingTimer();
 
     try {
       await recordingRef.current.stopAndUnloadAsync();
@@ -113,16 +121,172 @@ export function VoiceMemoRecorder({
           type: 'voice',
           uri,
           size: 0,
-          duration: elapsed,
+          duration: elapsedRef.current,
+          mimeType: 'audio/m4a',
         };
-        onAdd(memo);
+        addMemo(memo);
       }
 
       setRecordState('idle');
       setElapsed(0);
+      elapsedRef.current = 0;
     } catch (err) {
       console.error('Failed to stop recording:', err);
       setRecordState('idle');
+    }
+  }
+
+  function beginRecordingTimer() {
+    setRecordState('recording');
+    setElapsed(0);
+    elapsedRef.current = 0;
+
+    timerRef.current = setInterval(() => {
+      setElapsed(prev => {
+        const next = Math.min(prev + 1, maxDuration);
+        elapsedRef.current = next;
+
+        if (next >= maxDuration) {
+          stopRecording();
+        }
+
+        return next;
+      });
+    }, 1000);
+  }
+
+  function clearRecordingTimer() {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  }
+
+  async function startWebRecording() {
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+      showError(
+        'Voice recording needs microphone access from a secure page. Open the app on https:// or http://localhost, not a LAN/http URL.'
+      );
+      return;
+    }
+
+    if (typeof MediaRecorder === 'undefined') {
+      showError('Voice recording is not supported in this browser. Please try Chrome, Edge, or Safari.');
+      return;
+    }
+
+    if (typeof window !== 'undefined' && !window.isSecureContext) {
+      showError(
+        'Microphone recording is blocked because this page is not secure. Use https:// or http://localhost to record voice memos.'
+      );
+      return;
+    }
+
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (error: any) {
+      const message = error?.name === 'NotAllowedError'
+        ? 'Microphone permission was denied. Allow microphone access in the browser, then try again.'
+        : 'Could not access the microphone. Please check your browser microphone settings.';
+      showError(message);
+      return;
+    }
+
+    const mimeType = getSupportedWebAudioMimeType();
+    const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+
+    webChunksRef.current = [];
+    webStreamRef.current = stream;
+    webRecorderRef.current = recorder;
+
+    recorder.ondataavailable = (event) => {
+      if (event.data.size > 0) {
+        webChunksRef.current.push(event.data);
+      }
+    };
+
+    recorder.onstop = () => {
+      clearRecordingTimer();
+      const blobType = recorder.mimeType || mimeType || 'audio/webm';
+      const blob = new Blob(webChunksRef.current, { type: blobType });
+
+      if (blob.size === 0) {
+        showError('No audio was recorded. Please try again and speak after the timer starts.');
+        cleanupWebRecording();
+        setRecordState('idle');
+        setElapsed(0);
+        elapsedRef.current = 0;
+        return;
+      }
+
+      const uri = URL.createObjectURL(blob);
+
+      const memo: MediaAttachment = {
+        id: `voice-${Date.now()}`,
+        type: 'voice',
+        uri,
+        size: blob.size,
+        duration: elapsedRef.current,
+        mimeType: blobType,
+      };
+
+      cleanupWebRecording();
+      webRecorderRef.current = null;
+      webChunksRef.current = [];
+      setRecordState('idle');
+      setElapsed(0);
+      elapsedRef.current = 0;
+      addMemo(memo);
+    };
+
+    recorder.onerror = () => {
+      showError('Recording failed in the browser. Please try again.');
+      cleanupWebRecording();
+      setRecordState('idle');
+      setElapsed(0);
+      elapsedRef.current = 0;
+    };
+
+    recorder.start(250);
+    beginRecordingTimer();
+  }
+
+  function stopWebRecording() {
+    if (!webRecorderRef.current || webRecorderRef.current.state !== 'recording') return;
+    webRecorderRef.current.stop();
+  }
+
+  function getSupportedWebAudioMimeType(): string | undefined {
+    if (typeof MediaRecorder.isTypeSupported !== 'function') {
+      return undefined;
+    }
+
+    const supportedTypes = [
+      'audio/webm;codecs=opus',
+      'audio/webm',
+      'audio/mp4',
+    ];
+
+    return supportedTypes.find(type => MediaRecorder.isTypeSupported(type));
+  }
+
+  function addMemo(memo: MediaAttachment) {
+    Promise.resolve(onAdd(memo)).catch((error) => {
+      console.error('Failed to save voice memo:', error);
+      Alert.alert('Error', 'Could not save this voice memo.');
+    });
+  }
+
+  function cleanupWebRecording() {
+    webStreamRef.current?.getTracks().forEach(track => track.stop());
+    webStreamRef.current = null;
+  }
+
+  function showError(message: string) {
+    setWebError(message);
+    if (Platform.OS !== 'web') {
+      Alert.alert('Error', message);
     }
   }
 
@@ -246,9 +410,16 @@ export function VoiceMemoRecorder({
       {recordState === 'idle' && voiceMemos.length < 3 && (
         <Pressable style={styles.recordButton} onPress={startRecording}>
           <View style={styles.recordDot} />
-          <Text style={styles.recordButtonText}>Hold to record a voice memo</Text>
+          <Text style={styles.recordButtonText}>Tap to record a voice memo</Text>
         </Pressable>
       )}
+
+      {webError ? (
+        <View style={styles.errorBox}>
+          <MaterialIcons name="error-outline" size={16} color={theme.colors.error} />
+          <Text style={styles.errorText}>{webError}</Text>
+        </View>
+      ) : null}
 
       {recordState === 'recording' && (
         <View style={styles.recordingActive}>
@@ -365,6 +536,21 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: theme.colors.primary,
+  },
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: theme.spacing.sm,
+    backgroundColor: theme.colors.errorLight,
+    borderRadius: theme.borderRadius.sm,
+    padding: theme.spacing.sm,
+  },
+  errorText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 18,
+    color: theme.colors.error,
+    fontWeight: '500',
   },
   recordingActive: {
     flexDirection: 'row',

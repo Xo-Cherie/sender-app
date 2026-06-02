@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
+import { Audio } from 'expo-av';
 import { Image as ExpoImage } from 'expo-image';
 import Animated, {
   useSharedValue,
@@ -25,6 +26,13 @@ import { supabase } from '@/lib/supabase';
 import { resolveCardFrontImage, normalizeCardFrontImage, getCardImageSource } from '@/lib/cardImages';
 import type { ReceivedCard } from '@/types';
 
+function formatTime(seconds?: number): string {
+  const value = Math.max(0, Math.round(seconds || 0));
+  const minutes = Math.floor(value / 60);
+  const remainingSeconds = value % 60;
+  return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+}
+
 export default function DeviceCardViewer() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -37,6 +45,8 @@ export default function DeviceCardViewer() {
   const [isFlipped, setIsFlipped] = useState(false);
   const [xoSent, setXoSent] = useState(false);
   const [pinned, setPinned] = useState(false);
+  const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null);
+  const soundRef = useRef<Audio.Sound | null>(null);
 
   const rotation = useSharedValue(0);
   const xoScale = useSharedValue(1);
@@ -64,6 +74,12 @@ export default function DeviceCardViewer() {
     if (!id || !user) return;
     loadCard();
   }, [id, user]);
+
+  useEffect(() => {
+    return () => {
+      soundRef.current?.unloadAsync().catch(() => {});
+    };
+  }, []);
 
   async function loadCard() {
     setLoading(true);
@@ -145,6 +161,34 @@ export default function DeviceCardViewer() {
     await togglePin(card.id).catch(console.error);
   }
 
+  async function handlePlayVoice(uri: string, voiceId: string) {
+    if (soundRef.current) {
+      await soundRef.current.stopAsync().catch(() => {});
+      await soundRef.current.unloadAsync().catch(() => {});
+      soundRef.current = null;
+    }
+
+    if (playingVoiceId === voiceId) {
+      setPlayingVoiceId(null);
+      return;
+    }
+
+    const { sound } = await Audio.Sound.createAsync(
+      { uri },
+      { shouldPlay: true },
+      (status) => {
+        if (status.isLoaded && status.didJustFinish) {
+          setPlayingVoiceId(null);
+          soundRef.current?.unloadAsync().catch(() => {});
+          soundRef.current = null;
+        }
+      }
+    );
+
+    soundRef.current = sound;
+    setPlayingVoiceId(voiceId);
+  }
+
   if (loading) {
     return (
       <View style={styles.page}>
@@ -173,6 +217,7 @@ export default function DeviceCardViewer() {
   const frontImage = normalizeCardFrontImage(card.frontImage);
   const imageSource = frontImage ? getCardImageSource(frontImage) : null;
   const photos = card.mediaAttachments?.filter(a => a.type === 'photo') || [];
+  const voiceMemos = card.mediaAttachments?.filter(a => a.type === 'voice') || [];
 
   return (
     <View style={styles.page}>
@@ -277,11 +322,41 @@ export default function DeviceCardViewer() {
             {photos.length > 0 && (
               <View style={styles.photosBox}>
                 <Text style={styles.photosTitle}>Photos</Text>
-                <View style={styles.photosGrid}>
+                <View style={styles.photosList}>
                   {photos.map(photo => (
-                    <ExpoImage key={photo.id} source={{ uri: photo.uri }} style={styles.photoThumb} contentFit="cover" />
+                    <ExpoImage key={photo.id} source={{ uri: photo.uri }} style={styles.photoImage} contentFit="cover" />
                   ))}
                 </View>
+              </View>
+            )}
+
+            {/* Voice Memos */}
+            {voiceMemos.length > 0 && (
+              <View style={styles.voiceBox}>
+                <Text style={styles.voiceTitle}>Voice Memos</Text>
+                {voiceMemos.map((voice, index) => {
+                  const isPlaying = playingVoiceId === voice.id;
+
+                  return (
+                    <Pressable
+                      key={voice.id}
+                      style={styles.voiceRow}
+                      onPress={() => handlePlayVoice(voice.uri, voice.id)}
+                    >
+                      <View style={[styles.voicePlayBtn, isPlaying && styles.voicePlayBtnActive]}>
+                        <MaterialIcons
+                          name={isPlaying ? 'pause' : 'play-arrow'}
+                          size={22}
+                          color={isPlaying ? theme.colors.white : theme.colors.primary}
+                        />
+                      </View>
+                      <View style={styles.voiceInfo}>
+                        <Text style={styles.voiceLabel}>Voice Memo {index + 1}</Text>
+                        <Text style={styles.voiceDuration}>{formatTime(voice.duration)}</Text>
+                      </View>
+                    </Pressable>
+                  );
+                })}
               </View>
             )}
 
@@ -384,8 +459,28 @@ const styles = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 10, elevation: 2,
   },
   photosTitle: { fontSize: 14, fontWeight: '700', color: theme.colors.dark, marginBottom: 10 },
-  photosGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  photoThumb: { width: 80, height: 80, borderRadius: theme.borderRadius.sm },
+  photosList: { gap: 12 },
+  photoImage: { width: '100%', height: 220, borderRadius: theme.borderRadius.md },
+  voiceBox: {
+    backgroundColor: theme.colors.white, borderRadius: theme.borderRadius.lg, padding: 16, gap: 10,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 10, elevation: 2,
+  },
+  voiceTitle: { fontSize: 14, fontWeight: '700', color: theme.colors.dark, marginBottom: 2 },
+  voiceRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: theme.colors.cream,
+    borderRadius: theme.borderRadius.md,
+    padding: 12,
+  },
+  voicePlayBtn: {
+    width: 42, height: 42, borderRadius: 21,
+    backgroundColor: theme.colors.primaryLight,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  voicePlayBtnActive: { backgroundColor: theme.colors.primary },
+  voiceInfo: { flex: 1 },
+  voiceLabel: { fontSize: 14, fontWeight: '700', color: theme.colors.dark },
+  voiceDuration: { fontSize: 12, color: theme.colors.mediumGray, marginTop: 2 },
   infoBox: {
     backgroundColor: theme.colors.white, borderRadius: theme.borderRadius.lg, padding: 16, gap: 10,
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 10, elevation: 2,
