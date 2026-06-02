@@ -7,6 +7,7 @@ import {
   Pressable,
   RefreshControl,
   Modal,
+  useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -19,6 +20,7 @@ type FilterType = 'all' | 'unread' | 'pinned';
 
 export default function InboxScreen() {
   const router = useRouter();
+  const { width: screenWidth } = useWindowDimensions();
   const { receivedCards, loading, refreshCards, deleteReceivedCard } = useCards();
   const [filter, setFilter] = useState<FilterType>('all');
   const [refreshing, setRefreshing] = useState(false);
@@ -38,6 +40,12 @@ export default function InboxScreen() {
   });
 
   const unreadCount = receivedCards.filter(c => !c.isRead).length;
+  const gridHorizontalPadding = theme.spacing.lg * 2;
+  const gridColumnGap = theme.spacing.md;
+  const cardWidth = Math.max(
+    130,
+    Math.floor((screenWidth - gridHorizontalPadding - gridColumnGap) / 2)
+  );
 
   const filters: { key: FilterType; label: string }[] = [
     { key: 'all', label: 'All' },
@@ -110,6 +118,7 @@ export default function InboxScreen() {
               <View key={card.id} style={styles.cardWrapper}>
                 <CardPreview
                   card={card}
+                  width={cardWidth}
                   onPress={() => setLockedCardVisible(true)}
                 />
                 <Pressable

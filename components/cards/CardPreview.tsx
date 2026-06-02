@@ -9,18 +9,26 @@ interface CardPreviewProps {
   card: ReceivedCard;
   onPress: () => void;
   showBadge?: boolean;
+  width?: number;
 }
 
-export function CardPreview({ card, onPress, showBadge = true }: CardPreviewProps) {
+export function CardPreview({ card, onPress, showBadge = true, width }: CardPreviewProps) {
+  const imageHeight = width ? Math.round(width * 1.42) : 200;
+
   return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => [
         styles.container,
+        width ? { width } : null,
         pressed && styles.pressed,
       ]}
     >
-      <CardImage source={card.frontImage} style={styles.image} resizeMode="cover" />
+      <CardImage
+        source={card.frontImage}
+        style={[styles.image, { height: imageHeight }]}
+        resizeMode="cover"
+      />
       
       <View style={styles.info}>
         <Text style={styles.sender} numberOfLines={1}>
@@ -53,7 +61,9 @@ export function CardPreview({ card, onPress, showBadge = true }: CardPreviewProp
 const styles = StyleSheet.create({
   container: {
     width: 160,
-    marginRight: theme.spacing.md,
+    backgroundColor: theme.colors.white,
+    borderRadius: theme.borderRadius.md,
+    overflow: 'hidden',
     ...theme.shadows.card,
   },
   pressed: {
@@ -63,21 +73,26 @@ const styles = StyleSheet.create({
   image: {
     width: '100%',
     height: 200,
-    borderRadius: theme.borderRadius.md,
     backgroundColor: theme.colors.lightGray,
   },
   info: {
-    marginTop: theme.spacing.sm,
+    minHeight: 50,
+    paddingHorizontal: 8,
+    paddingTop: 7,
+    paddingBottom: 9,
+    justifyContent: 'center',
   },
   sender: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 13,
+    lineHeight: 17,
+    fontWeight: '700',
     color: theme.colors.dark,
   },
   date: {
     fontSize: 12,
+    lineHeight: 16,
     color: theme.colors.mediumGray,
-    marginTop: 2,
+    marginTop: 3,
   },
   unreadBadge: {
     position: 'absolute',
@@ -97,7 +112,7 @@ const styles = StyleSheet.create({
   },
   voiceBadge: {
     position: 'absolute',
-    bottom: 40,
+    bottom: 58,
     right: 8,
     backgroundColor: theme.colors.primary,
     borderRadius: 12,
