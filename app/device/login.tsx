@@ -30,9 +30,13 @@ export default function DeviceLogin() {
   const handleSignIn = async () => {
     if (!email.trim() || !password.trim()) { setError('Email and password are required'); return; }
     setLoading(true); setError('');
-    const { error: err } = await signIn(email.trim(), password);
+    const { error: err, mfaRequired } = await signIn(email.trim(), password);
     setLoading(false);
     if (err) { setError(err); return; }
+    if (mfaRequired) {
+      router.replace({ pathname: '/device/mfa-verify', params: { next: '/device/inbox' } });
+      return;
+    }
     router.replace('/device/inbox');
   };
 

@@ -5,17 +5,25 @@ import { useAuth } from '@/hooks/useAuth';
 import { theme } from '@/constants/theme';
 
 export default function DeviceIndex() {
-  const { user, loading } = useAuth();
+  const { user, loading, checkMfaRequired } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
     if (loading) return;
-    if (user) {
-      router.replace('/device/home');
-    } else {
-      router.replace('/device/login');
+    async function routeDevice() {
+      if (user) {
+        if (await checkMfaRequired()) {
+          router.replace({ pathname: '/device/mfa-verify', params: { next: '/device/home' } });
+        } else {
+          router.replace('/device/home');
+        }
+      } else {
+        router.replace('/device/login');
+      }
     }
-  }, [user, loading]);
+
+    routeDevice();
+  }, [user, loading, router, checkMfaRequired]);
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.cream, alignItems: 'center', justifyContent: 'center' }}>

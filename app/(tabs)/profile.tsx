@@ -17,8 +17,10 @@ import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import { useRouter } from 'expo-router';
+import QRCode from 'react-native-qrcode-svg';
 import { theme } from '@/constants/theme';
 import { useAuth } from '@/hooks/useAuth';
+import type { MfaEnrollment } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/Button';
 
@@ -35,7 +37,7 @@ const DEFAULT_PRIVACY: PrivacySettings = {
 };
 
 export default function ProfileScreen() {
-  const { user, signOut, refreshUser } = useAuth();
+  const { user, signOut, refreshUser, getMfaStatus, enrollMfa, verifyMfaEnrollment, disableMfa } = useAuth();
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
@@ -50,7 +52,11 @@ export default function ProfileScreen() {
   const [avatarUrl, setAvatarUrl] = useState<string | undefined>();
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
+  const [mfaLoading, setMfaLoading] = useState(false);
+  const [mfaEnabled, setMfaEnabled] = useState(false);
+  const [mfaFactorId, setMfaFactorId] = useState<string | undefined>();
+  const [mfaSetup, setMfaSetup] = useState<MfaEnrollment | null>(null);
+  const [mfaCode, setMfaCode] = useState('');
   const [privacy, setPrivacy] = useState<PrivacySettings>(DEFAULT_PRIVACY);
 
   useEffect(() => {
@@ -64,12 +70,32 @@ export default function ProfileScreen() {
     setGender(user.gender || '');
     setLocation(user.location || '');
     setAvatarUrl(user.avatar);
-    setTwoFactorEnabled(!!user.twoFactorEnabled);
     setPrivacy({
       ...DEFAULT_PRIVACY,
       ...(user.privacySettings || {}),
     });
   }, [user]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadStatus() {
+      if (!user) return;
+      setMfaLoading(true);
+      const status = await getMfaStatus();
+      if (mounted) {
+        setMfaEnabled(status.enabled);
+        setMfaFactorId(status.factorId);
+        setMfaLoading(false);
+      }
+    }
+
+    loadStatus();
+
+    return () => {
+      mounted = false;
+    };
+  }, [getMfaStatus, user]);
 
   const handleLogout = async () => {
     await signOut();
@@ -108,6 +134,60 @@ export default function ProfileScreen() {
     }
   };
 
+  const handleStartMfaSetup = async () => {
+    setMfaLoading(true);
+    setMfaCode('');
+    const { data, error } = await enrollMfa();
+    setMfaLoading(false);
+
+    if (error || !data) {
+      showMessage('2FA Setup Failed', error || 'Could not start two-factor setup.');
+      return;
+    }
+
+    setMfaSetup(data);
+  };
+
+  const handleVerifyMfaSetup = async () => {
+    if (!mfaSetup) return;
+    if (mfaCode.trim().length !== 6) {
+      showMessage('Invalid Code', 'Enter the 6-digit code from your authenticator app.');
+      return;
+    }
+
+    setMfaLoading(true);
+    const { error } = await verifyMfaEnrollment(mfaSetup.factorId, mfaCode.trim());
+    setMfaLoading(false);
+
+    if (error) {
+      showMessage('Verification Failed', error);
+      return;
+    }
+
+    setMfaEnabled(true);
+    setMfaFactorId(mfaSetup.factorId);
+    setMfaSetup(null);
+    setMfaCode('');
+    showMessage('2FA Enabled', 'Two-factor authentication is now enabled for this account.');
+  };
+
+  const handleDisableMfa = async () => {
+    setMfaLoading(true);
+    const { error } = await disableMfa(mfaFactorId);
+    setMfaLoading(false);
+
+    if (error) {
+      showMessage('Could Not Disable 2FA', error);
+      return;
+    }
+
+    setMfaEnabled(false);
+    setMfaFactorId(undefined);
+    setMfaSetup(null);
+    setMfaCode('');
+    showMessage('2FA Disabled', 'Two-factor authentication has been disabled.');
+  };
+
   const handleSave = async () => {
     const trimmedEmail = email.trim().toLowerCase();
     if (!firstName.trim() || !lastName.trim() || !displayName.trim() || !trimmedEmail) {
@@ -138,7 +218,6 @@ export default function ProfileScreen() {
         gender: gender.trim(),
         location: location.trim(),
         avatar_url: avatarUrl,
-        two_factor_enabled: twoFactorEnabled,
         privacy_settings: privacy,
       };
 
@@ -234,12 +313,59 @@ export default function ProfileScreen() {
           <SectionTitle icon="settings" title="Account Settings" />
           <Field label="New Password" value={newPassword} onChangeText={setNewPassword} secureTextEntry placeholder="Leave blank to keep current password" />
           <Field label="Confirm New Password" value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry />
-          <ToggleRow
-            label="Two-Factor Authentication"
-            description="Save your preference for added account security."
-            value={twoFactorEnabled}
-            onValueChange={setTwoFactorEnabled}
-          />
+          <View style={styles.mfaBox}>
+            <View style={styles.mfaHeader}>
+              <View>
+                <Text style={styles.mfaTitle}>Two-Factor Authentication</Text>
+                <Text style={styles.mfaDescription}>
+                  Require a 6-digit authenticator code after signing in.
+                </Text>
+              </View>
+              <View style={[styles.mfaStatusBadge, mfaEnabled && styles.mfaStatusBadgeEnabled]}>
+                <Text style={[styles.mfaStatusText, mfaEnabled && styles.mfaStatusTextEnabled]}>
+                  {mfaEnabled ? 'Enabled' : 'Off'}
+                </Text>
+              </View>
+            </View>
+
+            {mfaLoading && !mfaSetup ? (
+              <View style={styles.mfaLoadingRow}>
+                <ActivityIndicator color={theme.colors.primary} size="small" />
+                <Text style={styles.mfaDescription}>Checking two-factor status...</Text>
+              </View>
+            ) : mfaSetup ? (
+              <View style={styles.mfaSetup}>
+                {mfaSetup.uri ? (
+                  <View style={styles.qrWrap}>
+                    <QRCode value={mfaSetup.uri} size={180} />
+                  </View>
+                ) : null}
+                <Text style={styles.mfaDescription}>
+                  Scan this QR code in an authenticator app, then enter the 6-digit code.
+                </Text>
+                {mfaSetup.secret ? (
+                  <Text selectable style={styles.mfaSecret}>Manual key: {mfaSetup.secret}</Text>
+                ) : null}
+                <Field
+                  label="Authenticator Code"
+                  value={mfaCode}
+                  onChangeText={setMfaCode}
+                  keyboardType="number-pad"
+                  maxLength={6}
+                  placeholder="123456"
+                  style={styles.mfaCodeInput}
+                />
+                <View style={styles.mfaActions}>
+                  <Button title="Verify & Enable" onPress={handleVerifyMfaSetup} loading={mfaLoading} style={styles.mfaActionButton} />
+                  <Button title="Cancel" onPress={() => { setMfaSetup(null); setMfaCode(''); }} variant="ghost" style={styles.mfaActionButton} />
+                </View>
+              </View>
+            ) : mfaEnabled ? (
+              <Button title="Disable Two-Factor Authentication" onPress={handleDisableMfa} variant="outline" loading={mfaLoading} />
+            ) : (
+              <Button title="Set Up Two-Factor Authentication" onPress={handleStartMfaSetup} loading={mfaLoading} />
+            )}
+          </View>
         </View>
 
         <View style={styles.formSection}>
@@ -510,6 +636,82 @@ const styles = StyleSheet.create({
     color: theme.colors.mediumGray,
     lineHeight: 17,
     marginTop: 2,
+  },
+  mfaBox: {
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.lightGray,
+    paddingTop: theme.spacing.md,
+  },
+  mfaHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: theme.spacing.md,
+    marginBottom: theme.spacing.md,
+  },
+  mfaTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: theme.colors.dark,
+  },
+  mfaDescription: {
+    fontSize: 12,
+    color: theme.colors.mediumGray,
+    lineHeight: 17,
+    marginTop: 4,
+  },
+  mfaStatusBadge: {
+    backgroundColor: theme.colors.creamDark,
+    borderRadius: theme.borderRadius.full,
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
+  },
+  mfaStatusBadgeEnabled: {
+    backgroundColor: '#F0FFF4',
+  },
+  mfaStatusText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: theme.colors.mediumGray,
+  },
+  mfaStatusTextEnabled: {
+    color: theme.colors.success,
+  },
+  mfaLoadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+  },
+  mfaSetup: {
+    gap: theme.spacing.md,
+  },
+  qrWrap: {
+    alignSelf: 'center',
+    backgroundColor: theme.colors.white,
+    padding: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.lightGray,
+  },
+  mfaSecret: {
+    backgroundColor: theme.colors.cream,
+    borderRadius: theme.borderRadius.sm,
+    padding: theme.spacing.sm,
+    fontSize: 12,
+    color: theme.colors.charcoal,
+  },
+  mfaCodeInput: {
+    textAlign: 'center',
+    letterSpacing: 6,
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  mfaActions: {
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+  },
+  mfaActionButton: {
+    flex: 1,
   },
   saveSection: {
     marginHorizontal: theme.spacing.lg,

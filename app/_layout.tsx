@@ -13,6 +13,7 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="onboarding" />
           <Stack.Screen name="login" />
+          <Stack.Screen name="mfa-verify" />
           <Stack.Screen name="auth/callback" options={{ headerShown: false }} />
           <Stack.Screen 
             name="card-detail" 

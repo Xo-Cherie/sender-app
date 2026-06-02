@@ -64,8 +64,9 @@ export default function LoginScreen() {
     if (!email || !password) { setError('Please fill in all fields'); return; }
     setLoading(true);
     try {
-      const { error: authError } = await signIn(email, password);
+      const { error: authError, mfaRequired } = await signIn(email, password);
       if (authError) setError(authError);
+      else if (mfaRequired) router.replace({ pathname: '/mfa-verify', params: { next: '/(tabs)' } });
       else router.replace('/(tabs)');
     } catch (err: any) {
       setError(err.message || 'Sign in failed');

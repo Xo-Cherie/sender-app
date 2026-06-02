@@ -24,7 +24,7 @@ function DeviceNav() {
   const isDesktop = width >= 768;
 
   // Don't show nav on login page or card viewer
-  const hideNav = pathname === '/device/login' || pathname.startsWith('/device/card/');
+  const hideNav = pathname === '/device/login' || pathname === '/device/mfa-verify' || pathname.startsWith('/device/card/');
   if (hideNav || !user) return null;
 
   if (isDesktop) {
@@ -98,8 +98,26 @@ function DeviceShell({ children }: { children: React.ReactNode }) {
   const { width } = useWindowDimensions();
   const isDesktop = width >= 768;
   const pathname = usePathname();
-  const { user } = useAuth();
-  const hideNav = pathname === '/device/login' || pathname.startsWith('/device/card/');
+  const router = useRouter();
+  const { user, checkMfaRequired } = useAuth();
+  const hideNav = pathname === '/device/login' || pathname === '/device/mfa-verify' || pathname.startsWith('/device/card/');
+
+  React.useEffect(() => {
+    let mounted = true;
+
+    async function guardMfa() {
+      if (!user || hideNav) return;
+      if (await checkMfaRequired() && mounted) {
+        router.replace({ pathname: '/device/mfa-verify', params: { next: pathname } });
+      }
+    }
+
+    guardMfa();
+
+    return () => {
+      mounted = false;
+    };
+  }, [checkMfaRequired, hideNav, pathname, router, user]);
 
   return (
     <View style={{ flex: 1, flexDirection: isDesktop && !hideNav && user ? 'row' : 'column' }}>

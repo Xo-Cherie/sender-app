@@ -1,13 +1,34 @@
 import { MaterialIcons } from '@expo/vector-icons';
-import { Tabs } from 'expo-router';
+import { Tabs, useRouter } from 'expo-router';
+import { useEffect } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Platform, Text } from 'react-native';
 import { theme } from '@/constants/theme';
+import { useAuth } from '@/hooks/useAuth';
 import { useUnreadCount } from '@/hooks/useUnreadCount';
 
 export default function TabLayout() {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { user, checkMfaRequired } = useAuth();
   const { unreadCount } = useUnreadCount();
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function guardMfa() {
+      if (!user) return;
+      if (await checkMfaRequired() && mounted) {
+        router.replace({ pathname: '/mfa-verify', params: { next: '/(tabs)' } });
+      }
+    }
+
+    guardMfa();
+
+    return () => {
+      mounted = false;
+    };
+  }, [checkMfaRequired, router, user]);
 
   const tabBarStyle = {
     height: Platform.select({

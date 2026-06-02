@@ -7,7 +7,7 @@ import { theme } from '@/constants/theme';
 
 export default function Index() {
   const router = useRouter();
-  const { user, loading } = useAuth();
+  const { user, loading, checkMfaRequired } = useAuth();
 
   useEffect(() => {
     if (loading) return;
@@ -20,6 +20,8 @@ export default function Index() {
           router.replace('/onboarding');
         } else if (!user) {
           router.replace('/login');
+        } else if (await checkMfaRequired()) {
+          router.replace({ pathname: '/mfa-verify', params: { next: '/(tabs)' } });
         } else {
           router.replace('/(tabs)');
         }
@@ -30,7 +32,7 @@ export default function Index() {
     };
 
     checkOnboarding();
-  }, [router, user, loading]);
+  }, [router, user, loading, checkMfaRequired]);
 
   return (
     <View style={styles.container}>

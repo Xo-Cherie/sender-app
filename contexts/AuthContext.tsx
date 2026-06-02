@@ -5,16 +5,34 @@ import { supabase } from '@/lib/supabase';
 import { getAuthRedirectUrl } from '@/lib/authRedirect';
 import { User } from '@/types';
 
+export type MfaEnrollment = {
+  factorId: string;
+  qrCode?: string;
+  uri?: string;
+  secret?: string;
+};
+
+export type MfaStatus = {
+  enabled: boolean;
+  factorId?: string;
+};
+
 interface AuthContextType {
   session: Session | null;
   user: User | null;
   loading: boolean;
   signUp: (email: string, password: string, name: string) => Promise<{ error: string | null }>;
-  signIn: (email: string, password: string) => Promise<{ error: string | null }>;
+  signIn: (email: string, password: string) => Promise<{ error: string | null; mfaRequired?: boolean }>;
   signOut: () => Promise<void>;
   verifyOtp: (email: string, token: string) => Promise<{ error: string | null }>;
   resendOtp: (email: string) => Promise<{ error: string | null }>;
   refreshUser: () => Promise<void>;
+  checkMfaRequired: () => Promise<boolean>;
+  getMfaStatus: () => Promise<MfaStatus>;
+  enrollMfa: () => Promise<{ data: MfaEnrollment | null; error: string | null }>;
+  verifyMfaEnrollment: (factorId: string, code: string) => Promise<{ error: string | null }>;
+  verifyMfaChallenge: (code: string) => Promise<{ error: string | null }>;
+  disableMfa: (factorId?: string) => Promise<{ error: string | null }>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -43,6 +61,10 @@ function getPrivacySettings(...values: unknown[]): User['privacySettings'] {
     allowFriendRequests: value?.allowFriendRequests ?? true,
     shareBirthday: value?.shareBirthday ?? false,
   };
+}
+
+function getVerifiedTotpFactor(factors: any): any | undefined {
+  return factors?.totp?.find((factor: any) => factor.status === 'verified');
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -90,6 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function loadUserProfile(authUser: SupabaseUser) {
     const meta = (authUser.user_metadata || {}) as Record<string, unknown>;
     const fallbackName = buildNameFromAuthUser(authUser);
+    const mfaStatus = await getMfaStatus();
     const fallbackUser: User = {
       id: authUser.id,
       email: authUser.email || '',
@@ -102,7 +125,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       birthday: getStringField(meta.birthday),
       gender: getStringField(meta.gender),
       location: getStringField(meta.location),
-      twoFactorEnabled: meta.two_factor_enabled === true,
+      twoFactorEnabled: mfaStatus.enabled,
       privacySettings: getPrivacySettings(meta.privacy_settings),
     };
 
@@ -134,7 +157,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           birthday: getStringField(data.birthday, meta.birthday),
           gender: getStringField(data.gender, meta.gender),
           location: getStringField(data.location, meta.location),
-          twoFactorEnabled: data.two_factor_enabled === true || meta.two_factor_enabled === true,
+          twoFactorEnabled: mfaStatus.enabled,
           privacySettings: getPrivacySettings(data.privacy_settings, meta.privacy_settings),
         });
         return;
@@ -215,7 +238,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       if (error) return { error: error.message };
-      return { error: null };
+      const mfaRequired = await checkMfaRequired();
+      return { error: null, mfaRequired };
     } catch (error: any) {
       return { error: error.message || 'Sign in failed' };
     }
@@ -257,6 +281,112 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  async function checkMfaRequired() {
+    try {
+      const { data, error } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+      if (error) throw error;
+      return data.nextLevel === 'aal2' && data.currentLevel !== 'aal2';
+    } catch (error) {
+      console.warn('Could not check MFA assurance level:', error);
+      return false;
+    }
+  }
+
+  async function getMfaStatus(): Promise<MfaStatus> {
+    try {
+      const { data, error } = await supabase.auth.mfa.listFactors();
+      if (error) throw error;
+      const factor = getVerifiedTotpFactor(data);
+      return { enabled: !!factor, factorId: factor?.id };
+    } catch (error) {
+      console.warn('Could not load MFA factors:', error);
+      return { enabled: false };
+    }
+  }
+
+  async function enrollMfa(): Promise<{ data: MfaEnrollment | null; error: string | null }> {
+    try {
+      const { data, error } = await supabase.auth.mfa.enroll({
+        factorType: 'totp',
+        friendlyName: 'Xo Cherie',
+      });
+      if (error) return { data: null, error: error.message };
+
+      return {
+        data: {
+          factorId: data.id,
+          qrCode: data.totp?.qr_code,
+          uri: data.totp?.uri,
+          secret: data.totp?.secret,
+        },
+        error: null,
+      };
+    } catch (error: any) {
+      return { data: null, error: error.message || 'Could not start two-factor setup' };
+    }
+  }
+
+  async function verifyMfaEnrollment(factorId: string, code: string) {
+    try {
+      const { data: challenge, error: challengeError } = await supabase.auth.mfa.challenge({ factorId });
+      if (challengeError) return { error: challengeError.message };
+
+      const { error } = await supabase.auth.mfa.verify({
+        factorId,
+        challengeId: challenge.id,
+        code,
+      });
+      if (error) return { error: error.message };
+
+      await refreshUser();
+      return { error: null };
+    } catch (error: any) {
+      return { error: error.message || 'Could not verify two-factor code' };
+    }
+  }
+
+  async function verifyMfaChallenge(code: string) {
+    try {
+      const { data: factors, error: factorsError } = await supabase.auth.mfa.listFactors();
+      if (factorsError) return { error: factorsError.message };
+
+      const factor = getVerifiedTotpFactor(factors);
+      if (!factor) return { error: 'No verified two-factor method was found for this account.' };
+
+      const { error } = await supabase.auth.mfa.challengeAndVerify({
+        factorId: factor.id,
+        code,
+      });
+      if (error) return { error: error.message };
+
+      await refreshUser();
+      return { error: null };
+    } catch (error: any) {
+      return { error: error.message || 'Could not verify two-factor code' };
+    }
+  }
+
+  async function disableMfa(factorId?: string) {
+    try {
+      let targetFactorId = factorId;
+      if (!targetFactorId) {
+        const { data, error } = await supabase.auth.mfa.listFactors();
+        if (error) return { error: error.message };
+        targetFactorId = getVerifiedTotpFactor(data)?.id;
+      }
+
+      if (!targetFactorId) return { error: 'Two-factor authentication is not enabled.' };
+
+      const { error } = await supabase.auth.mfa.unenroll({ factorId: targetFactorId });
+      if (error) return { error: error.message };
+
+      await refreshUser();
+      return { error: null };
+    } catch (error: any) {
+      return { error: error.message || 'Could not disable two-factor authentication' };
+    }
+  }
+
   async function refreshUser() {
     const { data } = await supabase.auth.getUser();
     if (data.user) {
@@ -276,6 +406,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         verifyOtp,
         resendOtp,
         refreshUser,
+        checkMfaRequired,
+        getMfaStatus,
+        enrollMfa,
+        verifyMfaEnrollment,
+        verifyMfaChallenge,
+        disableMfa,
       }}
     >
       {children}
