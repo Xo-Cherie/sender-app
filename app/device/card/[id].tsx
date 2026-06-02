@@ -49,6 +49,7 @@ export default function DeviceCardViewer() {
   const [xoSent, setXoSent] = useState(false);
   const [pinned, setPinned] = useState(false);
   const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null);
+  const [voicePositions, setVoicePositions] = useState<Record<string, { position: number; duration: number }>>({});
   const [selectedPhotoUri, setSelectedPhotoUri] = useState<string | null>(null);
   const soundRef = useRef<Audio.Sound | null>(null);
   const webAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -180,6 +181,24 @@ export default function DeviceCardViewer() {
       try {
         const audio = new window.Audio(uri);
         audio.preload = 'auto';
+        audio.onloadedmetadata = () => {
+          setVoicePositions(prev => ({
+            ...prev,
+            [voiceId]: {
+              position: 0,
+              duration: Number.isFinite(audio.duration) ? audio.duration : prev[voiceId]?.duration || 0,
+            },
+          }));
+        };
+        audio.ontimeupdate = () => {
+          setVoicePositions(prev => ({
+            ...prev,
+            [voiceId]: {
+              position: Number.isFinite(audio.currentTime) ? audio.currentTime : 0,
+              duration: Number.isFinite(audio.duration) ? audio.duration : prev[voiceId]?.duration || 0,
+            },
+          }));
+        };
         audio.onended = () => {
           setPlayingVoiceId(null);
           webAudioRef.current = null;
@@ -207,10 +226,20 @@ export default function DeviceCardViewer() {
         { uri },
         { shouldPlay: true },
         (status) => {
-          if (status.isLoaded && status.didJustFinish) {
-            setPlayingVoiceId(null);
-            soundRef.current?.unloadAsync().catch(() => {});
-            soundRef.current = null;
+          if (status.isLoaded) {
+            setVoicePositions(prev => ({
+              ...prev,
+              [voiceId]: {
+                position: (status.positionMillis || 0) / 1000,
+                duration: (status.durationMillis || 0) / 1000,
+              },
+            }));
+
+            if (status.didJustFinish) {
+              setPlayingVoiceId(null);
+              soundRef.current?.unloadAsync().catch(() => {});
+              soundRef.current = null;
+            }
           }
         }
       );
@@ -234,6 +263,16 @@ export default function DeviceCardViewer() {
       webAudioRef.current.pause();
       webAudioRef.current.currentTime = 0;
       webAudioRef.current = null;
+    }
+
+    if (playingVoiceId) {
+      setVoicePositions(prev => ({
+        ...prev,
+        [playingVoiceId]: {
+          position: 0,
+          duration: prev[playingVoiceId]?.duration || 0,
+        },
+      }));
     }
   }
 
@@ -392,6 +431,10 @@ export default function DeviceCardViewer() {
                 <Text style={styles.voiceTitle}>Voice Memos</Text>
                 {voiceMemos.map((voice, index) => {
                   const isPlaying = playingVoiceId === voice.id;
+                  const playback = voicePositions[voice.id];
+                  const duration = playback?.duration || voice.duration || 0;
+                  const position = isPlaying ? playback?.position || 0 : 0;
+                  const progress = duration > 0 ? Math.min(position / duration, 1) : 0;
 
                   return (
                     <Pressable
@@ -408,7 +451,12 @@ export default function DeviceCardViewer() {
                       </View>
                       <View style={styles.voiceInfo}>
                         <Text style={styles.voiceLabel}>Voice Memo {index + 1}</Text>
-                        <Text style={styles.voiceDuration}>{formatTime(voice.duration)}</Text>
+                        <View style={styles.voiceProgressTrack}>
+                          <View style={[styles.voiceProgressFill, { width: `${progress * 100}%` }]} />
+                        </View>
+                        <Text style={styles.voiceDuration}>
+                          {formatTime(position)} / {formatTime(duration)}
+                        </Text>
                       </View>
                     </Pressable>
                   );
@@ -556,6 +604,19 @@ const styles = StyleSheet.create({
   voicePlayBtnActive: { backgroundColor: theme.colors.primary },
   voiceInfo: { flex: 1 },
   voiceLabel: { fontSize: 14, fontWeight: '700', color: theme.colors.dark },
+  voiceProgressTrack: {
+    height: 4,
+    backgroundColor: theme.colors.lightGray,
+    borderRadius: 2,
+    overflow: 'hidden',
+    marginTop: 7,
+    marginBottom: 5,
+  },
+  voiceProgressFill: {
+    height: '100%',
+    backgroundColor: theme.colors.primary,
+    borderRadius: 2,
+  },
   voiceDuration: { fontSize: 12, color: theme.colors.mediumGray, marginTop: 2 },
   infoBox: {
     backgroundColor: theme.colors.white, borderRadius: theme.borderRadius.lg, padding: 16, gap: 10,
