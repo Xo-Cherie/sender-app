@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls -la \"E:\\\\Osama_work\\\\Rdoug\\\\XoCherie-main\\\\XoCherie-main\\\\\" | head -30)",
+      "Read(//e/Osama_work/Rdoug/XoCherie-main/**)",
+      "PowerShell($content = Get-Content \"e:\\\\Osama_work\\\\Rdoug\\\\XoCherie-main\\\\XoCherie-main\\\\dist\\\\_expo\\\\static\\\\js\\\\web\\\\entry-c6d415a266161046c45cc2b89ced4130.js\" -Raw; $idx = $content.IndexOf\\('a554ed0'\\); $content.Substring\\([Math]::Max\\(0,$idx-300\\), 500\\))",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(Get-ChildItem -Path \"e:\\\\Osama_work\\\\Rdoug\\\\XoCherie-main\\\\XoCherie-main\" -Recurse -Directory)",
+      "Bash(Select-Object -First 30)",
+      "Bash(Format-Table FullName)"
+    ]
+  }
+}
