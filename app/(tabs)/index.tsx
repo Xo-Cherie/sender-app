@@ -10,6 +10,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { theme } from '@/constants/theme';
 import { useAuth } from '@/hooks/useAuth';
 import { useCards } from '@/hooks/useCards';
@@ -121,7 +122,11 @@ export default function HomeScreen() {
             onPress={() => router.push('/(tabs)/profile')}
             style={styles.avatarButton}
           >
-            <MaterialIcons name="person" size={22} color={theme.colors.primary} />
+            {user?.avatar ? (
+              <Image source={{ uri: user.avatar }} style={styles.avatarImage} contentFit="cover" />
+            ) : (
+              <MaterialIcons name="person" size={22} color={theme.colors.primary} />
+            )}
           </Pressable>
         </View>
 
@@ -306,6 +311,11 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
   },
   heroCard: {
     backgroundColor: theme.colors.primary,

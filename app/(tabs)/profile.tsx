@@ -128,6 +128,25 @@ export default function ProfileScreen() {
       const asset = result.assets[0];
       const publicUrl = await uploadAvatar(asset.uri, asset.mimeType);
       setAvatarUrl(publicUrl);
+
+      const { error: profileError } = await supabase
+        .from('user_profiles')
+        .upsert(
+          {
+            id: user.id,
+            email: user.email,
+            avatar_url: publicUrl,
+          },
+          { onConflict: 'id' }
+        );
+      if (profileError) throw profileError;
+
+      const { error: metadataError } = await supabase.auth.updateUser({
+        data: { avatar_url: publicUrl },
+      });
+      if (metadataError) throw metadataError;
+
+      await refreshUser();
     } catch (error: any) {
       showMessage('Avatar Upload Failed', error?.message || 'Could not upload profile photo.');
     } finally {
@@ -243,6 +262,7 @@ export default function ProfileScreen() {
             first_name: firstName.trim(),
             last_name: lastName.trim(),
             phone_number: phoneNumber.trim() || null,
+            avatar_url: avatarUrl,
           },
           { onConflict: 'id' }
         );
