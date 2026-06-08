@@ -10,25 +10,31 @@ import { useUnreadCount } from '@/hooks/useUnreadCount';
 export default function TabLayout() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { user, checkMfaRequired } = useAuth();
+  const { user, loading, checkMfaRequired } = useAuth();
   const { unreadCount } = useUnreadCount();
 
   useEffect(() => {
     let mounted = true;
 
-    async function guardMfa() {
-      if (!user) return;
+    async function guardAuth() {
+      if (loading) return;
+      if (!user) {
+        router.replace('/login');
+        return;
+      }
       if (await checkMfaRequired() && mounted) {
         router.replace({ pathname: '/mfa-verify', params: { next: '/(tabs)' } });
       }
     }
 
-    guardMfa();
+    guardAuth();
 
     return () => {
       mounted = false;
     };
-  }, [checkMfaRequired, router, user]);
+  }, [checkMfaRequired, loading, router, user]);
+
+  if (!loading && !user) return null;
 
   const tabBarStyle = {
     height: Platform.select({

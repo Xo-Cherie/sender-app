@@ -78,17 +78,28 @@ export function useCards() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (user) {
-      loadCards();
-      
-      // Auto-refresh every 30 seconds to check for new cards
-      const interval = setInterval(() => {
-        loadCards();
-      }, 30000);
-      
-      return () => clearInterval(interval);
+    if (!user) {
+      clearCards();
+      return;
     }
+
+    setLoading(true);
+    loadCards();
+    
+    // Auto-refresh every 30 seconds to check for new cards
+    const interval = setInterval(() => {
+      loadCards();
+    }, 30000);
+    
+    return () => clearInterval(interval);
   }, [user]);
+
+  function clearCards() {
+    setSentCards([]);
+    setReceivedCards([]);
+    setDrafts([]);
+    setLoading(false);
+  }
 
   async function loadCards() {
     if (!user || !user.id) {
@@ -574,6 +585,11 @@ export function useCards() {
   }
 
   async function refreshCards() {
+    if (!user?.id) {
+      clearCards();
+      return;
+    }
+
     setLoading(true);
     await loadCards();
   }

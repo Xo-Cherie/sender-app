@@ -22,6 +22,10 @@ function DeviceNav() {
   const { unreadCount } = useUnreadCount();
   const { width } = useWindowDimensions();
   const isDesktop = width >= 768;
+  const handleSignOut = async () => {
+    await signOut();
+    router.replace('/device/login');
+  };
 
   // Don't show nav on login page or card viewer
   const hideNav = pathname === '/device/login' || pathname === '/device/mfa-verify' || pathname.startsWith('/device/card/');
@@ -61,7 +65,7 @@ function DeviceNav() {
         </View>
 
         {/* Sign out */}
-        <Pressable style={nav.signOutRow} onPress={signOut}>
+        <Pressable style={nav.signOutRow} onPress={handleSignOut}>
           <MaterialIcons name="logout" size={18} color={theme.colors.mediumGray} />
           <Text style={nav.signOutText}>Sign out</Text>
         </Pressable>
@@ -99,25 +103,29 @@ function DeviceShell({ children }: { children: React.ReactNode }) {
   const isDesktop = width >= 768;
   const pathname = usePathname();
   const router = useRouter();
-  const { user, checkMfaRequired } = useAuth();
+  const { user, loading, checkMfaRequired } = useAuth();
   const hideNav = pathname === '/device/login' || pathname === '/device/mfa-verify' || pathname.startsWith('/device/card/');
 
   React.useEffect(() => {
     let mounted = true;
 
-    async function guardMfa() {
-      if (!user || hideNav) return;
+    async function guardAuth() {
+      if (hideNav || loading) return;
+      if (!user) {
+        router.replace('/device/login');
+        return;
+      }
       if (await checkMfaRequired() && mounted) {
         router.replace({ pathname: '/device/mfa-verify', params: { next: pathname } });
       }
     }
 
-    guardMfa();
+    guardAuth();
 
     return () => {
       mounted = false;
     };
-  }, [checkMfaRequired, hideNav, pathname, router, user]);
+  }, [checkMfaRequired, hideNav, loading, pathname, router, user]);
 
   return (
     <View style={{ flex: 1, flexDirection: isDesktop && !hideNav && user ? 'row' : 'column' }}>

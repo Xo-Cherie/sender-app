@@ -246,7 +246,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signOut() {
-    await supabase.auth.signOut();
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.warn('Sign out request failed:', error.message);
+      }
+    } catch (error) {
+      console.warn('Sign out request failed:', error);
+    } finally {
+      setSession(null);
+      setUser(null);
+      setLoading(false);
+    }
   }
 
   async function verifyOtp(email: string, token: string) {

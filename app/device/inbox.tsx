@@ -27,6 +27,10 @@ export default function DeviceInbox() {
   const { width } = useWindowDimensions();
   const [filter, setFilter] = useState<Filter>('all');
   const refreshCardsRef = useRef(refreshCards);
+  const handleSignOut = async () => {
+    await signOut();
+    router.replace('/device/login');
+  };
 
   useEffect(() => {
     refreshCardsRef.current = refreshCards;
@@ -90,7 +94,7 @@ export default function DeviceInbox() {
           <Pressable style={styles.refreshBtn} onPress={refreshCards}>
             <MaterialIcons name="refresh" size={20} color={theme.colors.primary} />
           </Pressable>
-          <Pressable style={styles.signOutBtn} onPress={signOut}>
+          <Pressable style={styles.signOutBtn} onPress={handleSignOut}>
             <MaterialIcons name="logout" size={18} color={theme.colors.mediumGray} />
             <Text style={styles.signOutText}>Sign out</Text>
           </Pressable>

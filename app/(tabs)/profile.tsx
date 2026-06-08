@@ -129,6 +129,11 @@ export default function ProfileScreen() {
       const publicUrl = await uploadAvatar(asset.uri, asset.mimeType);
       setAvatarUrl(publicUrl);
 
+      const { error: metadataError } = await supabase.auth.updateUser({
+        data: { avatar_url: publicUrl },
+      });
+      if (metadataError) throw metadataError;
+
       const { error: profileError } = await supabase
         .from('user_profiles')
         .upsert(
@@ -139,12 +144,13 @@ export default function ProfileScreen() {
           },
           { onConflict: 'id' }
         );
-      if (profileError) throw profileError;
-
-      const { error: metadataError } = await supabase.auth.updateUser({
-        data: { avatar_url: publicUrl },
-      });
-      if (metadataError) throw metadataError;
+      if (profileError) {
+        if (isMissingColumnError(profileError, 'avatar_url')) {
+          console.warn('user_profiles.avatar_url is missing; avatar was saved to auth metadata.');
+        } else {
+          throw profileError;
+        }
+      }
 
       await refreshUser();
     } catch (error: any) {
@@ -266,7 +272,26 @@ export default function ProfileScreen() {
           },
           { onConflict: 'id' }
         );
-      if (profileError) throw profileError;
+      if (profileError) {
+        if (isMissingColumnError(profileError, 'avatar_url')) {
+          const { error: retryError } = await supabase
+            .from('user_profiles')
+            .upsert(
+              {
+                id: user.id,
+                email: trimmedEmail,
+                first_name: firstName.trim(),
+                last_name: lastName.trim(),
+                phone_number: phoneNumber.trim() || null,
+              },
+              { onConflict: 'id' }
+            );
+          if (retryError) throw retryError;
+          console.warn('user_profiles.avatar_url is missing; profile avatar was saved to auth metadata.');
+        } else {
+          throw profileError;
+        }
+      }
 
       const { error: metadataError } = await supabase.auth.updateUser({ data: authData });
       if (metadataError) throw metadataError;
@@ -569,6 +594,11 @@ function getAvatarExtension(uri: string, mimeType?: string | null) {
   if (mimeType?.includes('webp')) return 'webp';
   const ext = uri.split('.').pop()?.toLowerCase().split('?')[0];
   return ext && /^[a-z0-9]+$/.test(ext) && ext.length <= 5 ? ext : 'jpg';
+}
+
+function isMissingColumnError(error: any, column: string) {
+  const message = typeof error?.message === 'string' ? error.message : '';
+  return message.includes(`'${column}' column`) || (error?.code === 'PGRST204' && message.includes(`'${column}'`));
 }
 
 const styles = StyleSheet.create({
