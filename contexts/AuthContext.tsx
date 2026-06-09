@@ -231,16 +231,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signIn(email: string, password: string) {
+    setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      if (error) return { error: error.message };
+      if (error) {
+        setLoading(false);
+        return { error: error.message };
+      }
+
+      if (data.user) {
+        await loadUserProfile(data.user);
+      }
+
       const mfaRequired = await checkMfaRequired();
       return { error: null, mfaRequired };
     } catch (error: any) {
+      setLoading(false);
       return { error: error.message || 'Sign in failed' };
     }
   }
