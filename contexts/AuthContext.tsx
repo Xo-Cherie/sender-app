@@ -67,26 +67,73 @@ function getVerifiedTotpFactor(factors: any): any | undefined {
   return factors?.totp?.find((factor: any) => factor.status === 'verified');
 }
 
+function isInvalidRefreshTokenError(error: unknown) {
+  const message = error instanceof Error ? error.message : '';
+  return message.includes('Invalid Refresh Token') || message.includes('Refresh Token Not Found');
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (session?.user) {
-        loadUserProfile(session.user);
-      } else {
-        setLoading(false);
+    let mounted = true;
+
+    async function initializeSession() {
+      try {
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        if (!mounted) return;
+
+        if (sessionError) {
+          if (isInvalidRefreshTokenError(sessionError)) {
+            await clearAuthSession();
+          } else {
+            console.warn('Could not restore auth session:', sessionError.message);
+            setLoading(false);
+          }
+          return;
+        }
+
+        if (!sessionData.session) {
+          setLoading(false);
+          return;
+        }
+
+        const { data: userData, error: userError } = await supabase.auth.getUser();
+        if (!mounted) return;
+
+        if (userError || !userData.user) {
+          if (userError && isInvalidRefreshTokenError(userError)) {
+            await clearAuthSession();
+          } else {
+            console.warn('Could not validate auth session:', userError?.message);
+            setLoading(false);
+          }
+          return;
+        }
+
+        setSession(sessionData.session);
+        await loadUserProfile(userData.user);
+      } catch (error) {
+        if (!mounted) return;
+        if (isInvalidRefreshTokenError(error)) {
+          await clearAuthSession();
+        } else {
+          console.warn('Could not initialize auth session:', error);
+          setLoading(false);
+        }
       }
-    });
+    }
+
+    initializeSession();
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!mounted) return;
       setSession(session);
       if (session?.user) {
+        setLoading(true);
         loadUserProfile(session.user);
       } else {
         setUser(null);
@@ -104,10 +151,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     return () => {
+      mounted = false;
       subscription.unsubscribe();
       appStateListener?.remove();
     };
   }, []);
+
+  async function clearAuthSession() {
+    try {
+      await supabase.auth.signOut({ scope: 'local' });
+    } catch (error) {
+      console.warn('Could not clear local auth session:', error);
+    } finally {
+      setSession(null);
+      setUser(null);
+      setLoading(false);
+    }
+  }
 
   async function loadUserProfile(authUser: SupabaseUser) {
     const meta = (authUser.user_metadata || {}) as Record<string, unknown>;

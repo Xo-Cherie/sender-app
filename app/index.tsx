@@ -5,11 +5,18 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '@/hooks/useAuth';
 import { theme } from '@/constants/theme';
 
+const APP_VARIANT = process.env.EXPO_PUBLIC_APP_VARIANT;
+
 export default function Index() {
   const router = useRouter();
   const { user, loading, checkMfaRequired } = useAuth();
 
   useEffect(() => {
+    if (APP_VARIANT === 'device') {
+      router.replace('/device');
+      return;
+    }
+
     if (loading) return;
 
     const checkOnboarding = async () => {
