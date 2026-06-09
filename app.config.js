@@ -1,4 +1,5 @@
 const IS_DEVICE_VARIANT = process.env.EXPO_PUBLIC_APP_VARIANT === 'device';
+const EAS_PROJECT_ID = process.env.EXPO_PUBLIC_EAS_PROJECT_ID || '22406cb6-5917-4bb4-a86f-123e5913ef1a';
 
 module.exports = {
   expo: {
@@ -57,9 +58,7 @@ module.exports = {
     extra: {
       appVariant: IS_DEVICE_VARIANT ? 'device' : 'main',
       router: {},
-      eas: {
-        projectId: '116f9b1c-fe55-4d94-814f-52b40adee1eb',
-      },
+      ...(EAS_PROJECT_ID ? { eas: { projectId: EAS_PROJECT_ID } } : {}),
     },
   },
 };

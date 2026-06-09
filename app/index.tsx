@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useRouter } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '@/hooks/useAuth';
@@ -12,11 +12,7 @@ export default function Index() {
   const { user, loading, checkMfaRequired } = useAuth();
 
   useEffect(() => {
-    if (APP_VARIANT === 'device') {
-      router.replace('/device');
-      return;
-    }
-
+    if (APP_VARIANT === 'device') return;
     if (loading) return;
 
     const checkOnboarding = async () => {
@@ -40,6 +36,10 @@ export default function Index() {
 
     checkOnboarding();
   }, [router, user, loading, checkMfaRequired]);
+
+  if (APP_VARIANT === 'device') {
+    return <Redirect href="/device" />;
+  }
 
   return (
     <View style={styles.container}>
