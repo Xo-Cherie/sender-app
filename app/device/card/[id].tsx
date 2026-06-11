@@ -36,6 +36,18 @@ function formatTime(seconds?: number): string {
   return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
 }
 
+function normalizeString(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function normalizeStringArray(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
+  }
+  if (typeof value === 'string' && value.trim()) return [value.trim()];
+  return [];
+}
+
 export default function DeviceCardViewer() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -115,13 +127,16 @@ export default function DeviceCardViewer() {
       const senderName = senderProfile
         ? `${senderProfile.first_name || ''} ${senderProfile.last_name || ''}`.trim() || senderProfile.email
         : 'Unknown';
+      const storedRecipientInfo = cardData.recipient_info || {};
+      const storedRecipientNames = normalizeStringArray(storedRecipientInfo.names);
+      const storedSenderName = normalizeString(storedRecipientInfo.senderName);
 
       const loaded: ReceivedCard = {
         id: rc.card_id,
         senderId: cardData.sender_id,
-        senderName,
+        senderName: storedSenderName || senderName,
         recipientIds: [user!.id],
-        recipientNames: [user!.name || user!.email],
+        recipientNames: storedRecipientNames.length > 0 ? storedRecipientNames : [user!.name || user!.email],
         category: 'birthday' as any,
         templateId: cardData.design_template || '',
         frontImage: resolveCardFrontImage(cardData.front_design_url, cardData.design_template),

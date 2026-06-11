@@ -22,6 +22,18 @@ function formatMediaTime(seconds?: number): string {
   return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
 }
 
+function normalizeString(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function normalizeStringArray(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
+  }
+  if (typeof value === 'string' && value.trim()) return [value.trim()];
+  return [];
+}
+
 export default function CardDetailScreen() {
   const { id, viewMode } = useLocalSearchParams<{ id: string; viewMode?: string }>();
   const router = useRouter();
@@ -90,17 +102,20 @@ export default function CardDetailScreen() {
           });
 
           const storedRecipientInfo = cardData.recipient_info || {};
-          const finalRecipientNames = (storedRecipientInfo.names && storedRecipientInfo.names.length > 0)
-            ? storedRecipientInfo.names
+          const storedRecipientNames = normalizeStringArray(storedRecipientInfo.names);
+          const storedSenderName = normalizeString(storedRecipientInfo.senderName);
+          const finalRecipientNames = storedRecipientNames.length > 0
+            ? storedRecipientNames
             : (dbRecipientNames.length > 0 ? dbRecipientNames : ['Unknown Recipient']);
-          const finalRecipientIds = (storedRecipientInfo.ids && storedRecipientInfo.ids.length > 0)
-            ? storedRecipientInfo.ids
+          const storedRecipientIds = normalizeStringArray(storedRecipientInfo.ids);
+          const finalRecipientIds = storedRecipientIds.length > 0
+            ? storedRecipientIds
             : (dbRecipientIds.length > 0 ? dbRecipientIds : []);
 
           const processedCard = {
             id: cardData.id,
             senderId: cardData.sender_id,
-            senderName: currentUser.name || currentUser.email,
+            senderName: storedSenderName || currentUser.name || currentUser.email,
             recipientIds: finalRecipientIds,
             recipientNames: finalRecipientNames,
             category: 'birthday' as any,
@@ -144,13 +159,16 @@ export default function CardDetailScreen() {
           const senderName = senderProfile
             ? `${senderProfile.first_name || ''} ${senderProfile.last_name || ''}`.trim() || senderProfile.email
             : 'Unknown';
+          const storedRecipientInfo = cardData.recipient_info || {};
+          const storedRecipientNames = normalizeStringArray(storedRecipientInfo.names);
+          const storedSenderName = normalizeString(storedRecipientInfo.senderName);
           
           setCard({
             id: rc.card_id,
             senderId: cardData.sender_id,
-            senderName,
+            senderName: storedSenderName || senderName,
             recipientIds: [currentUser.id],
-            recipientNames: [currentUser.name || currentUser.email],
+            recipientNames: storedRecipientNames.length > 0 ? storedRecipientNames : [currentUser.name || currentUser.email],
             category: 'birthday' as any,
             templateId: cardData.design_template || 'bday-1',
             frontImage: resolveCardFrontImage(cardData.front_design_url, cardData.design_template),
@@ -217,9 +235,7 @@ export default function CardDetailScreen() {
   const displayRecipientNames = Array.isArray(card.recipientNames) && card.recipientNames.length > 0
     ? card.recipientNames
     : ['Recipient'];
-  const displayRecipientName = isSentView 
-    ? displayRecipientNames[0]
-    : 'You';
+  const displayRecipientName = displayRecipientNames[0];
 
   console.log('🎨 RENDERING FLIPCARD WITH:');
   console.log('  frontImage:', displayFrontImage);

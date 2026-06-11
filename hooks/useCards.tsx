@@ -41,6 +41,10 @@ function normalizeStringArray(value: unknown): string[] {
   return [];
 }
 
+function normalizeString(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
 function normalizeEmail(value: unknown): string {
   return typeof value === 'string' ? value.trim().toLowerCase() : '';
 }
@@ -137,13 +141,16 @@ export function useCards() {
         .map((rc: any) => {
           const card = receivedCardById.get(rc.card_id);
           if (!card) return null;
+          const storedRecipientInfo = card.recipient_info || {};
+          const storedRecipientNames = normalizeStringArray(storedRecipientInfo.names);
+          const storedSenderName = normalizeString(storedRecipientInfo.senderName);
 
           return {
             id: rc.card_id,
             senderId: card.sender_id,
-            senderName: formatProfileName(profileById.get(card.sender_id)),
+            senderName: storedSenderName || formatProfileName(profileById.get(card.sender_id)),
             recipientIds: [user.id],
-            recipientNames: [user.name || user.email],
+            recipientNames: storedRecipientNames.length > 0 ? storedRecipientNames : [user.name || user.email],
             category: resolveCardCategory(card.design_template),
             templateId: card.design_template,
             frontImage: resolveCardFrontImage(card.front_design_url, card.design_template),
@@ -198,6 +205,7 @@ export function useCards() {
         const storedRecipientNames = normalizeStringArray(storedRecipientInfo.names);
         const storedRecipientIds = normalizeStringArray(storedRecipientInfo.ids);
         const storedRecipientEmails = normalizeStringArray(storedRecipientInfo.emails);
+        const storedSenderName = normalizeString(storedRecipientInfo.senderName);
         const finalRecipientNames = storedRecipientNames.length > 0
           ? storedRecipientNames
           : (dbRecipientNames.length > 0 ? dbRecipientNames : ['Unknown Recipient']);
@@ -214,7 +222,7 @@ export function useCards() {
         return {
           id: c.id,
           senderId: c.sender_id,
-          senderName: user.name || user.email,
+          senderName: storedSenderName || user.name || user.email,
           recipientIds: finalRecipientIds,
           recipientNames: finalRecipientNames,
           recipientEmails: storedRecipientEmails,
@@ -244,10 +252,11 @@ export function useCards() {
 
       const draftCards: Card[] = (draftsData || []).map((c: any) => {
         const storedRecipientInfo = c.recipient_info || {};
+        const storedSenderName = normalizeString(storedRecipientInfo.senderName);
         return {
           id: c.id,
           senderId: c.sender_id,
-          senderName: user.name || user.email,
+          senderName: storedSenderName || user.name || user.email,
           recipientIds: normalizeStringArray(storedRecipientInfo.ids),
           recipientNames: normalizeStringArray(storedRecipientInfo.names),
           recipientEmails: normalizeStringArray(storedRecipientInfo.emails),
@@ -317,10 +326,16 @@ export function useCards() {
 
       // Store recipient info for display purposes
       // Only store valid UUIDs in ids to avoid trigger failures
+      const displayRecipientName = normalizeString(card.recipientDisplayName)
+        || normalizeStringArray(card.recipientNames).join(', ');
+      const displaySenderName = normalizeString(card.senderDisplayName) || card.senderName;
       const recipientInfo = {
         ids: validRecipientIds,
-        names: [...validRecipientNames, ...customRecipientNames],
+        names: displayRecipientName
+          ? [displayRecipientName]
+          : [...validRecipientNames, ...customRecipientNames],
         emails: customRecipientEmails,
+        senderName: displaySenderName,
       };
 
       // Always store front_design_url as a template reference so it can be resolved on any platform
@@ -374,7 +389,7 @@ export function useCards() {
             cardId: cardData.id,
             cardTitle: template?.title || 'a card',
             messagePreview: card.personalMessage?.slice(0, 180),
-            inviterName: card.senderName,
+            inviterName: displaySenderName,
           },
         });
 
@@ -525,8 +540,9 @@ export function useCards() {
             gift_details: card.gift,
             recipient_info: {
               ids: card.recipientIds,
-              names: card.recipientNames,
+              names: card.recipientDisplayName ? [card.recipientDisplayName] : card.recipientNames,
               emails: card.recipientEmails || [],
+              senderName: card.senderDisplayName || card.senderName,
             },
           })
           .eq('id', card.id)
@@ -546,8 +562,9 @@ export function useCards() {
             gift_details: card.gift,
             recipient_info: {
               ids: card.recipientIds,
-              names: card.recipientNames,
+              names: card.recipientDisplayName ? [card.recipientDisplayName] : card.recipientNames,
               emails: card.recipientEmails || [],
+              senderName: card.senderDisplayName || card.senderName,
             },
             status: 'draft',
           });

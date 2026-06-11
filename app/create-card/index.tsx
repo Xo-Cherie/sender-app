@@ -163,6 +163,8 @@ export default function CreateCardScreen() {
 
     setSending(true);
     try {
+      const cardRecipientDisplayName = previewRecipientName.trim();
+      const cardSenderDisplayName = senderDisplayName.trim() || user.name || user.email;
       const recipientIds: string[] = [];
       const recipientNames: string[] = [];
       const recipientEmails: string[] = [];
@@ -191,9 +193,11 @@ export default function CreateCardScreen() {
       const card: Card = {
         id: 'card-' + Date.now(),
         senderId: user.id,
-        senderName: senderDisplayName || user.name || user.email,
+        senderName: cardSenderDisplayName,
         recipientIds,
         recipientNames,
+        senderDisplayName: cardSenderDisplayName,
+        recipientDisplayName: cardRecipientDisplayName,
         recipientEmails,
         category: selectedTemplate_data.category,
         templateId: selectedTemplate_data.id,

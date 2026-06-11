@@ -56,6 +56,8 @@ export interface Card {
   senderName: string;
   recipientIds: string[];
   recipientNames: string[];
+  senderDisplayName?: string;
+  recipientDisplayName?: string;
   recipientEmails?: string[];
   category: CardCategory;
   templateId: string;
