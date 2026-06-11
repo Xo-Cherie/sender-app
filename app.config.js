@@ -16,6 +16,13 @@ module.exports = {
       bundleIdentifier: IS_DEVICE_VARIANT
         ? 'com.osamakhanfree.cheriedevice'
         : 'com.osamakhanfree.xocherie',
+      infoPlist: {
+        ITSAppUsesNonExemptEncryption: false,
+        NSMicrophoneUsageDescription:
+          'Xo Cherie uses the microphone so you can record voice memos for greeting cards.',
+        NSPhotoLibraryUsageDescription:
+          'Xo Cherie needs photo library access so you can choose images for cards and your profile.',
+      },
     },
     android: {
       adaptiveIcon: {

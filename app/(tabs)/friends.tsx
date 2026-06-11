@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Modal, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { theme } from '@/constants/theme';
 import { useFriends } from '@/hooks/useFriends';
@@ -10,6 +11,7 @@ import { Image } from 'expo-image';
 import { invokeEdgeFunction } from '@/lib/edgeFunctions';
 
 export default function FriendsScreen() {
+  const router = useRouter();
   const { friends, searchResults, searching, searchUsers, addFriend, addFriendByEmail, acceptFriendRequest, removeFriend } = useFriends();
   const [showAddModal, setShowAddModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -140,6 +142,10 @@ export default function FriendsScreen() {
     setAddMode('search');
   };
 
+  const handleSendCardToFriend = (friendId: string) => {
+    router.push({ pathname: '/create-card', params: { recipientId: friendId } });
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -207,7 +213,13 @@ export default function FriendsScreen() {
             </View>
           ) : (
             acceptedFriends.map(friend => (
-              <View key={friend.id} style={styles.friendItem}>
+              <Pressable
+                key={friend.id}
+                style={({ pressed }) => [styles.friendItem, pressed && styles.friendItemPressed]}
+                onPress={() => handleSendCardToFriend(friend.id)}
+                accessibilityRole="button"
+                accessibilityLabel={`Send a card to ${friend.name}`}
+              >
                 {friend.avatar ? (
                   <Image source={{ uri: friend.avatar }} style={styles.avatar} />
                 ) : (
@@ -221,8 +233,8 @@ export default function FriendsScreen() {
                   <Text style={styles.friendName}>{friend.name}</Text>
                   <Text style={styles.friendEmail}>{friend.email}</Text>
                 </View>
-                <MaterialIcons name="chevron-right" size={20} color={theme.colors.lightGray} />
-              </View>
+                <MaterialIcons name="chevron-right" size={22} color={theme.colors.primary} />
+              </Pressable>
             ))
           )}
         </View>
@@ -454,6 +466,10 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.sm,
     gap: theme.spacing.md,
     ...theme.shadows.card,
+  },
+  friendItemPressed: {
+    opacity: 0.85,
+    transform: [{ scale: 0.99 }],
   },
   avatar: {
     width: 46,

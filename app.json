@@ -9,7 +9,13 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.osamakhanfree.xocherie",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSMicrophoneUsageDescription": "Xo Cherie uses the microphone so you can record voice memos for greeting cards.",
+        "NSPhotoLibraryUsageDescription": "Xo Cherie needs photo library access so you can choose images for cards and your profile."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -50,7 +56,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "116f9b1c-fe55-4d94-814f-52b40adee1eb"
+        "projectId": "22406cb6-5917-4bb4-a86f-123e5913ef1a"
       }
     }
   }

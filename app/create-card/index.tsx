@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { theme } from '@/constants/theme';
 import { CardImage } from '@/components/cards/CardImage';
@@ -36,6 +36,7 @@ export default function CreateCardScreen() {
   const templateImageHeight = Math.floor(templateCardWidth * 1.4);
 
   const router = useRouter();
+  const { recipientId: preselectedRecipientId } = useLocalSearchParams<{ recipientId?: string }>();
   const { friends } = useFriends();
   const { sendCard } = useCards();
   const { user } = useAuth();
@@ -61,6 +62,13 @@ export default function CreateCardScreen() {
 
   const acceptedFriends = friends.filter(f => f.status === 'accepted');
   const selectedTemplate_data = cardTemplates.find(t => t.id === selectedTemplate);
+  const selectedRecipientNames = selectedRecipients
+    .map(id => friends.find(f => f.id === id)?.name)
+    .filter(Boolean) as string[];
+  const previewRecipientName = recipientDisplayName ||
+    selectedRecipientNames.join(', ') ||
+    customEmail ||
+    'Recipient';
 
   const categories = Object.entries(categoryLabels);
 
@@ -71,6 +79,21 @@ export default function CreateCardScreen() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (!preselectedRecipientId) return;
+
+    const friend = friends.find(f =>
+      f.status === 'accepted' &&
+      (f.id === preselectedRecipientId || f.userId === preselectedRecipientId)
+    );
+
+    if (!friend) return;
+
+    setSelectedRecipients(prev =>
+      prev.includes(friend.id) ? prev : [friend.id]
+    );
+  }, [friends, preselectedRecipientId]);
 
   const goToOutbox = () => {
     router.replace('/(tabs)/outbox');
@@ -495,7 +518,7 @@ export default function CreateCardScreen() {
               <FlipCard
                 frontImage={selectedTemplate_data.frontImage}
                 backMessage={personalMessage || selectedTemplate_data.backMessage}
-                recipientName={recipientDisplayName || 'Recipient'}
+                recipientName={previewRecipientName}
                 senderName={senderDisplayName || 'You'}
                 mediaAttachments={mediaAttachments}
                 size="large"
@@ -505,14 +528,7 @@ export default function CreateCardScreen() {
               <Text style={styles.previewLabel}>From:</Text>
               <Text style={styles.previewValue}>{senderDisplayName || user?.name || user?.email || 'You'}</Text>
               <Text style={[styles.previewLabel, { marginTop: theme.spacing.md }]}>To:</Text>
-              <Text style={styles.previewValue}>
-                {recipientDisplayName ||
-                  [
-                    ...selectedRecipients.map(id => friends.find(f => f.id === id)?.name).filter(Boolean),
-                    ...(customEmail ? [customEmail] : []),
-                  ].join(', ') ||
-                  'Recipient'}
-              </Text>
+              <Text style={styles.previewValue}>{previewRecipientName}</Text>
               {gift && (
                 <>
                   <Text style={[styles.previewLabel, { marginTop: theme.spacing.md }]}>Gift:</Text>
