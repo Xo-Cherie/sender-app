@@ -488,12 +488,12 @@ export default function CardDetailScreen() {
                 style={[styles.actionButton, receivedCard.isPinned && styles.actionButtonActive]}
               >
                 <MaterialIcons
-                  name={receivedCard.isPinned ? 'push-pin' : 'push-pin'}
+                  name="bookmark"
                   size={24}
                   color={receivedCard.isPinned ? theme.colors.white : theme.colors.dark}
                 />
                 <Text style={[styles.actionText, receivedCard.isPinned && styles.actionTextActive]}>
-                  {receivedCard.isPinned ? 'Pinned' : 'Pin'}
+                  {receivedCard.isPinned ? 'Saved to Keepsakes' : 'Save to Keepsakes'}
                 </Text>
               </Pressable>
 

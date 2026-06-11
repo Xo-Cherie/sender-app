@@ -18,7 +18,7 @@ import { supabase } from '@/lib/supabase';
 import { normalizeCardFrontImage, getCardImageSource } from '@/lib/cardImages';
 import type { ReceivedCard } from '@/types';
 
-type Filter = 'all' | 'unread' | 'pinned';
+type Filter = 'all' | 'unread';
 
 export default function DeviceInbox() {
   const router = useRouter();
@@ -59,7 +59,6 @@ export default function DeviceInbox() {
 
   const filtered = receivedCards.filter(card => {
     if (filter === 'unread') return !card.isRead;
-    if (filter === 'pinned') return card.isPinned;
     return true;
   });
 
@@ -103,7 +102,7 @@ export default function DeviceInbox() {
 
       {/* Filters */}
       <View style={styles.filters}>
-        {(['all', 'unread', 'pinned'] as Filter[]).map(f => (
+        {(['all', 'unread'] as Filter[]).map(f => (
           <Pressable
             key={f}
             style={[styles.filterChip, filter === f && styles.filterChipActive]}
@@ -129,7 +128,7 @@ export default function DeviceInbox() {
               <MaterialIcons name="mail-outline" size={40} color={theme.colors.primary} />
             </View>
             <Text style={styles.emptyTitle}>
-              {filter === 'unread' ? 'No unread cards' : filter === 'pinned' ? 'No pinned cards' : 'No cards yet'}
+              {filter === 'unread' ? 'No unread cards' : 'No cards yet'}
             </Text>
             <Text style={styles.emptySub}>Cards sent to you will appear here</Text>
           </View>
@@ -163,10 +162,10 @@ function CardTile({ card, width, height, onPress }: { card: ReceivedCard; width:
       {/* Unread dot */}
       {!card.isRead && <View style={tileStyles.unreadDot} />}
 
-      {/* Pin icon */}
+      {/* Keepsake icon */}
       {card.isPinned && (
         <View style={tileStyles.pinBadge}>
-          <MaterialIcons name="push-pin" size={12} color={theme.colors.primary} />
+          <MaterialIcons name="bookmark" size={12} color={theme.colors.primary} />
         </View>
       )}
 

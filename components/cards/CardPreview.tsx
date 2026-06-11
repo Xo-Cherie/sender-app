@@ -45,7 +45,7 @@ export function CardPreview({ card, onPress, showBadge = true, width }: CardPrev
 
       {card.isPinned && (
         <View style={styles.pinnedIcon}>
-          <MaterialIcons name="push-pin" size={18} color={theme.colors.primary} />
+          <MaterialIcons name="bookmark" size={18} color={theme.colors.primary} />
         </View>
       )}
 

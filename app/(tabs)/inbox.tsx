@@ -16,7 +16,7 @@ import { theme } from '@/constants/theme';
 import { useCards } from '@/hooks/useCards';
 import { CardPreview } from '@/components/cards/CardPreview';
 
-type FilterType = 'all' | 'unread' | 'pinned';
+type FilterType = 'all' | 'unread';
 
 export default function InboxScreen() {
   const router = useRouter();
@@ -35,7 +35,6 @@ export default function InboxScreen() {
 
   const filteredCards = receivedCards.filter(card => {
     if (filter === 'unread') return !card.isRead;
-    if (filter === 'pinned') return card.isPinned;
     return true;
   });
 
@@ -50,7 +49,6 @@ export default function InboxScreen() {
   const filters: { key: FilterType; label: string }[] = [
     { key: 'all', label: 'All' },
     { key: 'unread', label: `Unread${unreadCount > 0 ? ` (${unreadCount})` : ''}` },
-    { key: 'pinned', label: 'Pinned' },
   ];
 
   return (
