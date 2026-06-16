@@ -320,6 +320,29 @@ export function useCards() {
         }
       });
 
+      const emailsNeedingInvite: string[] = [];
+      for (const email of customRecipientEmails) {
+        const { data: profile, error: profileLookupError } = await supabase
+          .from('user_profiles')
+          .select('id')
+          .eq('email', email)
+          .maybeSingle();
+
+        if (profileLookupError) {
+          console.warn('Could not look up recipient email:', email, profileLookupError.message);
+          emailsNeedingInvite.push(email);
+          continue;
+        }
+
+        if (profile?.id) {
+          if (!validRecipientIds.includes(profile.id)) {
+            validRecipientIds.push(profile.id);
+          }
+        } else {
+          emailsNeedingInvite.push(email);
+        }
+      }
+
       // Store recipient info for display purposes
       // Only store valid UUIDs in ids to avoid trigger failures
       const displayRecipientName = normalizeString(card.recipientDisplayName)
@@ -354,7 +377,7 @@ export function useCards() {
         }
       }
 
-      if (validRecipientIds.length === 0 && customRecipientEmails.length === 0) {
+      if (validRecipientIds.length === 0 && emailsNeedingInvite.length === 0) {
         throw new Error('Add at least one accepted friend or a recipient email before sending.');
       }
 
@@ -384,7 +407,7 @@ export function useCards() {
       const template = cardTemplates.find(t => t.id === card.templateId);
       const inviteErrors: string[] = [];
 
-      for (const email of customRecipientEmails) {
+      for (const email of emailsNeedingInvite) {
         const { error } = await invokeEdgeFunction('invite-friend', {
           body: {
             type: 'card',
