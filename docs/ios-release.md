@@ -5,7 +5,7 @@ This checklist is for the default Xo Cherie iOS app.
 ## App Identity
 
 - App name: Xo Cherie
-- Bundle ID: `com.osamakhanfree.xocherie`
+- Bundle ID: `com.xocherie.app`
 - EAS project: `@rdoug555s-team/xocherie`
 - EAS project ID: `22406cb6-5917-4bb4-a86f-123e5913ef1a`
 - Version: `1.0.0`
@@ -16,7 +16,7 @@ This checklist is for the default Xo Cherie iOS app.
 Complete these in Apple Developer and App Store Connect before building for TestFlight:
 
 - Confirm the Apple Developer Program membership is active.
-- Create or verify the explicit App ID `com.osamakhanfree.xocherie`.
+- Create or verify the explicit App ID `com.xocherie.app`.
 - Create the App Store Connect app record for Xo Cherie.
 - Give the EAS operator access to the Apple team, or run the EAS credential setup from an interactive terminal.
 - Use EAS-managed signing credentials unless an existing distribution certificate and provisioning profile must be imported.

@@ -14,8 +14,8 @@ module.exports = {
     ios: {
       supportsTablet: true,
       bundleIdentifier: IS_DEVICE_VARIANT
-        ? 'com.osamakhanfree.cheriedevice'
-        : 'com.osamakhanfree.xocherie',
+        ? 'com.xocherie.device'
+        : 'com.xocherie.app',
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
         NSMicrophoneUsageDescription:
@@ -33,11 +33,12 @@ module.exports = {
       permissions: [
         'READ_EXTERNAL_STORAGE',
         'READ_MEDIA_IMAGES',
+        'POST_NOTIFICATIONS',
         'RECORD_AUDIO',
       ],
       package: IS_DEVICE_VARIANT
-        ? 'com.osamakhanfree.cheriedevice'
-        : 'com.osamakhanfree.xocherie',
+        ? 'com.xocherie.device'
+        : 'com.xocherie.app',
     },
     web: {
       bundler: 'metro',
@@ -53,6 +54,14 @@ module.exports = {
           imageWidth: 200,
           resizeMode: 'contain',
           backgroundColor: '#ffffff',
+        },
+      ],
+      [
+        'expo-notifications',
+        {
+          icon: './assets/images/notification-icon.png',
+          color: '#C17B66',
+          defaultChannel: 'default',
         },
       ],
       '@react-native-community/datetimepicker',

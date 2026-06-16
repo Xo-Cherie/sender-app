@@ -3,6 +3,7 @@ import { AppState } from 'react-native';
 import { Session, User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { getAuthRedirectUrl } from '@/lib/authRedirect';
+import { unregisterPushToken } from '@/lib/notifications';
 import { User } from '@/types';
 
 export type MfaEnrollment = {
@@ -317,6 +318,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function signOut() {
     try {
+      await unregisterPushToken();
       const { error } = await supabase.auth.signOut();
       if (error) {
         console.warn('Sign out request failed:', error.message);
