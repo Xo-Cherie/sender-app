@@ -105,11 +105,19 @@ Set function secrets:
 supabase secrets set PUSH_DISPATCH_SECRET=your-random-secret
 ```
 
-Configure database dispatch settings in Supabase SQL:
+Configure database dispatch settings in Supabase SQL (hosted projects cannot use `ALTER DATABASE`):
 
 ```sql
-alter database postgres set app.push_dispatch_url = 'https://YOUR_PROJECT_REF.supabase.co/functions/v1/send-push-notification';
-alter database postgres set app.push_dispatch_secret = 'your-random-secret';
+insert into public.notification_dispatch_config (id, dispatch_url, dispatch_secret)
+values (
+  1,
+  'https://YOUR_PROJECT_REF.supabase.co/functions/v1/send-push-notification',
+  'your-random-secret'
+)
+on conflict (id) do update set
+  dispatch_url = excluded.dispatch_url,
+  dispatch_secret = excluded.dispatch_secret,
+  updated_at = timezone('utc', now());
 ```
 
 Alternative: create a Supabase Database Webhook on `notification_events` INSERT that POSTs `{ "eventId": "<id>" }` to `send-push-notification` with header `X-Push-Dispatch-Secret`.
