@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Card, ReceivedCard, RecipientDeliveryStatus } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { invokeEdgeFunction } from '@/lib/edgeFunctions';
+import { claimInvitedCardsForSession } from '@/lib/claimInvitedCards';
 import { useAuth } from './useAuth';
 import { CardCategory, cardTemplates } from '@/constants/cardTemplates';
 import { resolveCardFrontImage } from '@/lib/cardImages';
@@ -283,12 +284,7 @@ export function useCards() {
   }
 
   async function claimInvitedCards(): Promise<void> {
-    if (!user?.email) return;
-
-    const { error } = await invokeEdgeFunction('claim-card-invites');
-    if (error) {
-      console.warn('Failed to claim invited cards:', await getFunctionErrorMessage(error));
-    }
+    await claimInvitedCardsForSession();
   }
 
   async function sendCard(card: Card): Promise<void> {
@@ -361,20 +357,23 @@ export function useCards() {
         throw cardError;
       }
 
-      // Create received_cards entries for each valid registered recipient
-      for (const recipientId of validRecipientIds) {
-
-        const { error: receivedError } = await supabase
+      if (validRecipientIds.length > 0) {
+        const { data: deliveredRows, error: deliveredError } = await supabase
           .from('received_cards')
-          .insert({
-            card_id: cardData.id,
-            recipient_id: recipientId,
-            is_read: false,
-            is_pinned: false,
-          });
+          .select('recipient_id')
+          .eq('card_id', cardData.id);
 
-        if (receivedError) {
-          console.error('Failed to create received card for recipient', recipientId, ':', receivedError);
+        if (deliveredError) {
+          throw new Error(`Card was saved, but delivery could not be confirmed: ${deliveredError.message}`);
+        }
+
+        const deliveredRecipientIds = new Set((deliveredRows || []).map((row) => row.recipient_id));
+        const undeliveredRecipientIds = validRecipientIds.filter((recipientId) => !deliveredRecipientIds.has(recipientId));
+
+        if (undeliveredRecipientIds.length > 0) {
+          throw new Error(
+            `Card was saved, but it did not reach ${undeliveredRecipientIds.length} recipient(s). Ask them to refresh Inbox or sign in again.`
+          );
         }
       }
 

@@ -50,16 +50,16 @@ Deno.serve(async (req) => {
   const normalizedEmail = user.email.trim().toLowerCase();
   const serviceClient = createClient(supabaseUrl, serviceRoleKey);
 
-  const { data: cards, error: cardsError } = await serviceClient
-    .from('cards')
-    .select('id, recipient_info')
-    .contains('recipient_info', { emails: [normalizedEmail] });
+  const { data: matchedCardIds, error: cardsError } = await serviceClient.rpc(
+    'find_cards_for_invite_email',
+    { p_email: normalizedEmail }
+  );
 
   if (cardsError) {
     return jsonResponse({ error: cardsError.message }, 500);
   }
 
-  const cardIds = (cards || []).map((card: any) => card.id).filter(Boolean);
+  const cardIds = (matchedCardIds || []).filter(Boolean);
   if (cardIds.length === 0) {
     return jsonResponse({ ok: true, claimed: 0 });
   }

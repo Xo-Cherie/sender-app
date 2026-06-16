@@ -3,6 +3,7 @@ import { AppState } from 'react-native';
 import { Session, User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { getAuthRedirectUrl } from '@/lib/authRedirect';
+import { claimInvitedCardsForSession } from '@/lib/claimInvitedCards';
 import { unregisterPushToken } from '@/lib/notifications';
 import { User } from '@/types';
 
@@ -221,22 +222,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           twoFactorEnabled: mfaStatus.enabled,
           privacySettings: getPrivacySettings(data.privacy_settings, meta.privacy_settings),
         });
-        return;
+      } else {
+        // No profile row yet — e.g. a brand-new recipient who just signed up from
+        // an invite link, or an account whose creation trigger didn't run.
+        // Create it so the account behaves identically on every device.
+        await ensureUserProfile(authUser);
+        setUser(fallbackUser);
       }
-
-      // No profile row yet — e.g. a brand-new recipient who just signed up from
-      // an invite link, or an account whose creation trigger didn't run.
-      // Create it so the account behaves identically on every device.
-      await ensureUserProfile(authUser);
-      setUser(fallbackUser);
     } catch (error) {
       console.error('Error loading user profile:', error);
       // Never block a valid session on profile issues. Falling back to the auth
       // user guarantees the inbox/cards still load (they only need id + email).
       setUser(fallbackUser);
-    } finally {
-      setLoading(false);
     }
+
+    await claimInvitedCardsForSession();
+    setLoading(false);
   }
 
   async function ensureUserProfile(authUser: SupabaseUser) {
