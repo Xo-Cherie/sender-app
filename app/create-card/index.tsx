@@ -212,9 +212,13 @@ export default function CreateCardScreen() {
       await sendCard(card);
       setSent(true);
       redirectTimerRef.current = setTimeout(goToOutbox, 1200);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to send card:', error);
-      alert('Failed to send card. Please try again.');
+      const message =
+        typeof error?.message === 'string' && error.message.trim()
+          ? error.message
+          : 'Failed to send card. Please try again.';
+      alert(message);
     } finally {
       setSending(false);
     }

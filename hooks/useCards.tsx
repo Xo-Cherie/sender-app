@@ -334,6 +334,30 @@ export function useCards() {
         senderName: displaySenderName,
       };
 
+      if (validRecipientIds.length > 0) {
+        const { data: recipientProfiles, error: recipientLookupError } = await supabase
+          .from('user_profiles')
+          .select('id')
+          .in('id', validRecipientIds);
+
+        if (recipientLookupError) {
+          throw new Error(`Could not verify recipients: ${recipientLookupError.message}`);
+        }
+
+        const foundRecipientIds = new Set((recipientProfiles || []).map((profile) => profile.id));
+        const missingRecipientIds = validRecipientIds.filter((recipientId) => !foundRecipientIds.has(recipientId));
+
+        if (missingRecipientIds.length > 0) {
+          throw new Error(
+            'One or more selected friends do not have a complete account yet. Remove them and use "Send to email" instead, or ask them to finish signing up first.'
+          );
+        }
+      }
+
+      if (validRecipientIds.length === 0 && customRecipientEmails.length === 0) {
+        throw new Error('Add at least one accepted friend or a recipient email before sending.');
+      }
+
       // Always store front_design_url as a template reference so it can be resolved on any platform
       const frontDesignUrl = `template:${card.templateId}`;
 
@@ -355,26 +379,6 @@ export function useCards() {
       if (cardError) {
         console.error('Failed to insert card:', cardError);
         throw cardError;
-      }
-
-      if (validRecipientIds.length > 0) {
-        const { data: deliveredRows, error: deliveredError } = await supabase
-          .from('received_cards')
-          .select('recipient_id')
-          .eq('card_id', cardData.id);
-
-        if (deliveredError) {
-          throw new Error(`Card was saved, but delivery could not be confirmed: ${deliveredError.message}`);
-        }
-
-        const deliveredRecipientIds = new Set((deliveredRows || []).map((row) => row.recipient_id));
-        const undeliveredRecipientIds = validRecipientIds.filter((recipientId) => !deliveredRecipientIds.has(recipientId));
-
-        if (undeliveredRecipientIds.length > 0) {
-          throw new Error(
-            `Card was saved, but it did not reach ${undeliveredRecipientIds.length} recipient(s). Ask them to refresh Inbox or sign in again.`
-          );
-        }
       }
 
       const template = cardTemplates.find(t => t.id === card.templateId);
