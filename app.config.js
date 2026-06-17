@@ -18,6 +18,7 @@ module.exports = {
         : 'com.xocherie.app',
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
+        UIBackgroundModes: ['remote-notification'],
         NSMicrophoneUsageDescription:
           'Xo Cherie uses the microphone so you can record voice memos for greeting cards.',
         NSPhotoLibraryUsageDescription:

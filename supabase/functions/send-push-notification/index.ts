@@ -95,12 +95,11 @@ async function processEvent(serviceClient: ReturnType<typeof createClient>, even
     await serviceClient
       .from('notification_events')
       .update({
-        status: 'sent',
-        sent_at: new Date().toISOString(),
+        status: 'pending',
         last_error: 'No active push tokens for recipient',
       })
       .eq('id', event.id);
-    return { sent: 0, deactivated: 0 };
+    return { sent: 0, deactivated: 0, skipped: 'no_active_tokens' };
   }
 
   const messages = activeTokens.map((token) => ({

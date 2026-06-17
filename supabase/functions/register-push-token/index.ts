@@ -105,5 +105,38 @@ Deno.serve(async (req) => {
 
   if (error) return jsonResponse({ error: error.message }, 500);
 
-  return jsonResponse({ ok: true });
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  const dispatchSecret = Deno.env.get('PUSH_DISPATCH_SECRET');
+  let pendingDispatched = 0;
+
+  if (serviceRoleKey && dispatchSecret) {
+    const serviceClient = createClient(supabaseUrl, serviceRoleKey);
+    const { data: pendingEvents } = await serviceClient
+      .from('notification_events')
+      .select('id')
+      .eq('recipient_user_id', user.id)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: true })
+      .limit(25);
+
+    const dispatchUrl = `${supabaseUrl}/functions/v1/send-push-notification`;
+
+    for (const event of pendingEvents || []) {
+      try {
+        const response = await fetch(dispatchUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Push-Dispatch-Secret': dispatchSecret,
+          },
+          body: JSON.stringify({ eventId: event.id }),
+        });
+        if (response.ok) pendingDispatched += 1;
+      } catch {
+        // Non-fatal: token registration succeeded; dispatch can be retried later.
+      }
+    }
+  }
+
+  return jsonResponse({ ok: true, pendingDispatched });
 });

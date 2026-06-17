@@ -68,79 +68,16 @@ Push notifications require a development/preview/production EAS build. They do n
 
 ### 5. Push Notifications Setup
 
-#### A. Configure EAS credentials
+See the full guide: [docs/push-notifications.md](./docs/push-notifications.md)
 
-Android (FCM):
-1. Create a Firebase project and Android app entries for `com.xocherie.app` and `com.xocherie.device` if needed.
-2. Upload the Firebase service account / FCM credentials in Expo EAS for each Android package.
-
-iOS (APNs):
-1. Create an APNs key in Apple Developer.
-2. Upload the APNs key in Expo EAS for `com.xocherie.app` and `com.xocherie.device` if needed.
-
-Use:
+Quick start:
 
 ```bash
-npx eas-cli credentials
+npm run push:setup
+npm run push:process-pending
 ```
 
-#### B. Deploy Supabase backend
-
-Apply migrations:
-
-```bash
-supabase db push
-```
-
-Deploy Edge Functions:
-
-```bash
-supabase functions deploy register-push-token
-supabase functions deploy send-push-notification
-```
-
-Set function secrets:
-
-```bash
-supabase secrets set PUSH_DISPATCH_SECRET=your-random-secret
-```
-
-Configure database dispatch settings in Supabase SQL (hosted projects cannot use `ALTER DATABASE`):
-
-```sql
-insert into public.notification_dispatch_config (id, dispatch_url, dispatch_secret)
-values (
-  1,
-  'https://YOUR_PROJECT_REF.supabase.co/functions/v1/send-push-notification',
-  'your-random-secret'
-)
-on conflict (id) do update set
-  dispatch_url = excluded.dispatch_url,
-  dispatch_secret = excluded.dispatch_secret,
-  updated_at = timezone('utc', now());
-```
-
-Alternative: create a Supabase Database Webhook on `notification_events` INSERT that POSTs `{ "eventId": "<id>" }` to `send-push-notification` with header `X-Push-Dispatch-Secret`.
-
-Manual retry for pending events:
-
-```bash
-curl -X POST "https://YOUR_PROJECT_REF.supabase.co/functions/v1/send-push-notification" \
-  -H "Content-Type: application/json" \
-  -H "X-Push-Dispatch-Secret: your-random-secret" \
-  -d '{"processPending": true}'
-```
-
-#### C. Device testing checklist
-
-1. Install a fresh EAS preview build on Android and iOS.
-2. Sign in and allow notification permission.
-3. Confirm a row appears in `device_push_tokens`.
-4. Send a card to another account and verify `card_received`.
-5. Send a friend request and verify `friend_request`.
-6. Send an Xo from recipient account and verify `xo_received`.
-7. Test foreground, background, and killed-app tap routing.
-8. Sign out and confirm the token is deactivated.
+Push requires an **EAS device build** (not Expo Go or web). Configure FCM (Android) and APNs (iOS) in `npx eas-cli credentials`.
 
 ### 6. Lint the Code
 

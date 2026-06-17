@@ -9,6 +9,9 @@
     "web": "expo start --web",
     "build": "expo export --platform web",
     "functions:serve": "supabase functions serve --no-verify-jwt --env-file supabase/functions/.env.local",
+    "push:setup": "powershell -ExecutionPolicy Bypass -File ./scripts/push-setup.ps1",
+    "push:process-pending": "powershell -ExecutionPolicy Bypass -File ./scripts/push-process-pending.ps1",
+    "push:deploy": "supabase functions deploy register-push-token && supabase functions deploy send-push-notification",
     "lint": "expo lint"
   },
   "dependencies": {

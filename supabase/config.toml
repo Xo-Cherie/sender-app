@@ -1,0 +1,13 @@
+# Supabase project config (linked project: kaxmrthocgmpfbsbvpge)
+
+[functions.send-push-notification]
+verify_jwt = false
+
+[functions.register-push-token]
+verify_jwt = true
+
+[functions.claim-card-invites]
+verify_jwt = true
+
+[functions.invite-friend]
+verify_jwt = true
