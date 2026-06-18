@@ -16,6 +16,10 @@ export type PushNotificationData = {
 };
 
 const PUSH_TOKEN_STORAGE_KEY = 'xocherie:last-expo-push-token';
+export const CARD_ARRIVAL_CHANNEL_ID = 'card-arrivals';
+
+const recentDeviceCardAlerts = new Set<string>();
+const DEVICE_CARD_ALERT_DEDUPE_MS = 20_000;
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -55,6 +59,48 @@ export async function ensureAndroidNotificationChannel() {
     vibrationPattern: [0, 250, 250, 250],
     lightColor: '#C17B66',
     sound: 'default',
+  });
+
+  await Notifications.setNotificationChannelAsync(CARD_ARRIVAL_CHANNEL_ID, {
+    name: 'New cards',
+    importance: Notifications.AndroidImportance.MAX,
+    vibrationPattern: [0, 300, 200, 300],
+    lightColor: '#C17B66',
+    sound: 'default',
+    enableVibrate: true,
+    bypassDnd: false,
+  });
+}
+
+export async function alertDeviceNewCard(options: {
+  cardId: string;
+  title?: string;
+  body?: string;
+}) {
+  if (getAppVariant() !== 'device' || Platform.OS === 'web') return;
+
+  const cardId = options.cardId.trim();
+  if (!cardId || recentDeviceCardAlerts.has(cardId)) return;
+
+  recentDeviceCardAlerts.add(cardId);
+  setTimeout(() => recentDeviceCardAlerts.delete(cardId), DEVICE_CARD_ALERT_DEDUPE_MS);
+
+  await ensureAndroidNotificationChannel();
+
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      title: options.title ?? 'New card received',
+      body: options.body ?? 'A new card has arrived on your Cherie Device',
+      sound: 'default',
+      priority: Notifications.AndroidNotificationPriority.MAX,
+      data: {
+        type: 'card_received',
+        cardId,
+        appVariant: 'device',
+      },
+      ...(Platform.OS === 'android' ? { channelId: CARD_ARRIVAL_CHANNEL_ID } : {}),
+    },
+    trigger: null,
   });
 }
 

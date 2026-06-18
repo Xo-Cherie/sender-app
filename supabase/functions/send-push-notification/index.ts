@@ -102,6 +102,9 @@ async function processEvent(serviceClient: ReturnType<typeof createClient>, even
     return { sent: 0, deactivated: 0, skipped: 'no_active_tokens' };
   }
 
+  const channelId =
+    event.event_type === 'card_received' ? 'card-arrivals' : 'default';
+
   const messages = activeTokens.map((token) => ({
     to: token.expo_push_token,
     sound: 'default',
@@ -113,7 +116,7 @@ async function processEvent(serviceClient: ReturnType<typeof createClient>, even
       appVariant: event.data?.appVariant || token.app_variant,
     },
     priority: 'high',
-    channelId: 'default',
+    channelId,
   }));
 
   const expoResponse = await sendExpoPushMessages(messages);

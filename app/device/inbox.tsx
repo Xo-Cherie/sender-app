@@ -15,6 +15,7 @@ import { theme } from '@/constants/theme';
 import { useAuth } from '@/hooks/useAuth';
 import { useCards } from '@/hooks/useCards';
 import { supabase } from '@/lib/supabase';
+import { alertDeviceNewCard } from '@/lib/notifications';
 import { normalizeCardFrontImage, getCardImageSource } from '@/lib/cardImages';
 import type { ReceivedCard } from '@/types';
 
@@ -51,7 +52,15 @@ export default function DeviceInbox() {
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'received_cards', filter: `recipient_id=eq.${user.id}` },
-        () => { refreshCardsRef.current(); }
+        (payload) => {
+          refreshCardsRef.current();
+          const cardId = (payload.new as { card_id?: string })?.card_id;
+          if (cardId) {
+            alertDeviceNewCard({ cardId }).catch((error) => {
+              console.warn('Card arrival alert failed:', error);
+            });
+          }
+        }
       )
       .subscribe();
     return () => { supabase.removeChannel(channel); };

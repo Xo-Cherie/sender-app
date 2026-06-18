@@ -4,6 +4,7 @@ import * as Notifications from 'expo-notifications';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/hooks/useAuth';
 import {
+  ensureAndroidNotificationChannel,
   getRouteFromNotificationData,
   parseNotificationData,
   registerPushTokenForUser,
@@ -14,6 +15,14 @@ export function PushNotificationProvider({ children }: { children: React.ReactNo
   const { user, loading } = useAuth();
   const lastRegisteredUserIdRef = useRef<string | null>(null);
   const handledInitialNotificationRef = useRef(false);
+
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+
+    ensureAndroidNotificationChannel().catch((error) => {
+      console.warn('Failed to configure notification channels:', error);
+    });
+  }, []);
 
   useEffect(() => {
     if (Platform.OS === 'web') return;
