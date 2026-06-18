@@ -1,5 +1,6 @@
-import React from 'react';
-import { View, Text, StyleSheet, Pressable, useWindowDimensions } from 'react-native';
+import React, { useEffect } from 'react';
+import { Platform, View, Text, StyleSheet, Pressable, useWindowDimensions } from 'react-native';
+import { prepareDeviceCardAlertSound } from '@/lib/deviceCardAlertSound';
 import { Stack, useRouter, usePathname } from 'expo-router';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -100,6 +101,13 @@ function DeviceNav() {
 }
 
 function DeviceShell({ children }: { children: React.ReactNode }) {
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    prepareDeviceCardAlertSound().catch((error) => {
+      console.warn('Failed to prepare device alert sound:', error);
+    });
+  }, []);
+
   const { width } = useWindowDimensions();
   const isDesktop = width >= 768;
   const pathname = usePathname();

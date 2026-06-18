@@ -63,6 +63,7 @@ module.exports = {
           icon: './assets/images/notification-icon.png',
           color: '#C17B66',
           defaultChannel: 'default',
+          sounds: ['./assets/sounds/card_arrival.wav'],
         },
       ],
       '@react-native-community/datetimepicker',

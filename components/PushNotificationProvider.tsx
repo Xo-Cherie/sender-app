@@ -3,6 +3,7 @@ import { AppState, Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/hooks/useAuth';
+import { playDeviceCardArrivalSound, prepareDeviceCardAlertSound } from '@/lib/deviceCardAlertSound';
 import {
   ensureAndroidNotificationChannel,
   getRouteFromNotificationData,
@@ -21,6 +22,10 @@ export function PushNotificationProvider({ children }: { children: React.ReactNo
 
     ensureAndroidNotificationChannel().catch((error) => {
       console.warn('Failed to configure notification channels:', error);
+    });
+
+    prepareDeviceCardAlertSound().catch((error) => {
+      console.warn('Failed to prepare device card alert sound:', error);
     });
   }, []);
 
@@ -80,7 +85,12 @@ export function PushNotificationProvider({ children }: { children: React.ReactNo
     }
 
     const receivedSubscription = Notifications.addNotificationReceivedListener((notification) => {
-      console.log('Push notification received in foreground:', notification.request.identifier);
+      const data = parseNotificationData(notification);
+      if (data?.type === 'card_received') {
+        playDeviceCardArrivalSound().catch((error) => {
+          console.warn('Foreground card alert sound failed:', error);
+        });
+      }
     });
 
     const responseSubscription = Notifications.addNotificationResponseReceivedListener((response) => {

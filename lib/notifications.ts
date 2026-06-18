@@ -3,6 +3,7 @@ import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+import { playDeviceCardArrivalSound } from '@/lib/deviceCardAlertSound';
 import { invokeEdgeFunction } from '@/lib/edgeFunctions';
 
 export type PushNotificationType = 'card_received' | 'friend_request' | 'xo_received';
@@ -16,7 +17,8 @@ export type PushNotificationData = {
 };
 
 const PUSH_TOKEN_STORAGE_KEY = 'xocherie:last-expo-push-token';
-export const CARD_ARRIVAL_CHANNEL_ID = 'card-arrivals';
+export const CARD_ARRIVAL_CHANNEL_ID = 'card-alerts';
+export const CARD_ARRIVAL_SOUND = 'card_arrival';
 
 const recentDeviceCardAlerts = new Set<string>();
 const DEVICE_CARD_ALERT_DEDUPE_MS = 20_000;
@@ -33,7 +35,15 @@ Notifications.setNotificationHandler({
 
 function getAppVariant(): 'main' | 'device' {
   const variant = Constants.expoConfig?.extra?.appVariant;
-  return variant === 'device' ? 'device' : 'main';
+  if (variant === 'device') return 'device';
+
+  const androidPackage = Constants.expoConfig?.android?.package;
+  const iosBundleId = Constants.expoConfig?.ios?.bundleIdentifier;
+  if (androidPackage === 'com.xocherie.device' || iosBundleId === 'com.xocherie.device') {
+    return 'device';
+  }
+
+  return 'main';
 }
 
 function getEasProjectId(): string | undefined {
@@ -66,7 +76,7 @@ export async function ensureAndroidNotificationChannel() {
     importance: Notifications.AndroidImportance.MAX,
     vibrationPattern: [0, 300, 200, 300],
     lightColor: '#C17B66',
-    sound: 'default',
+    sound: CARD_ARRIVAL_SOUND,
     enableVibrate: true,
     bypassDnd: false,
   });
@@ -86,22 +96,27 @@ export async function alertDeviceNewCard(options: {
   setTimeout(() => recentDeviceCardAlerts.delete(cardId), DEVICE_CARD_ALERT_DEDUPE_MS);
 
   await ensureAndroidNotificationChannel();
+  await playDeviceCardArrivalSound();
 
-  await Notifications.scheduleNotificationAsync({
-    content: {
-      title: options.title ?? 'New card received',
-      body: options.body ?? 'A new card has arrived on your Cherie Device',
-      sound: 'default',
-      priority: Notifications.AndroidNotificationPriority.MAX,
-      data: {
-        type: 'card_received',
-        cardId,
-        appVariant: 'device',
+  try {
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: options.title ?? 'New card received',
+        body: options.body ?? 'A new card has arrived on your Cherie Device',
+        sound: CARD_ARRIVAL_SOUND,
+        priority: Notifications.AndroidNotificationPriority.MAX,
+        data: {
+          type: 'card_received',
+          cardId,
+          appVariant: 'device',
+        },
+        ...(Platform.OS === 'android' ? { channelId: CARD_ARRIVAL_CHANNEL_ID } : {}),
       },
-      ...(Platform.OS === 'android' ? { channelId: CARD_ARRIVAL_CHANNEL_ID } : {}),
-    },
-    trigger: null,
-  });
+      trigger: null,
+    });
+  } catch (error) {
+    console.warn('Device card notification banner failed:', error);
+  }
 }
 
 export async function requestPushPermissions(): Promise<boolean> {
