@@ -13,7 +13,13 @@ import { FlipCard } from '@/components/cards/FlipCard';
 import { Button } from '@/components/ui/Button';
 import { normalizeCardFrontImage, resolveCardFrontImage } from '@/lib/cardImages';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
-import { Card, ReceivedCard } from '@/types';
+import { Card, ReceivedCard, CardGiftTransaction } from '@/types';
+import { useGifts } from '@/hooks/useGifts';
+import {
+  centsToDollars,
+  getGiftStatusLabel,
+  mapGiftRow,
+} from '@/lib/gifts';
 
 function formatMediaTime(seconds?: number): string {
   const value = Math.max(0, Math.round(seconds || 0));
@@ -32,6 +38,122 @@ function normalizeStringArray(value: unknown): string[] {
   }
   if (typeof value === 'string' && value.trim()) return [value.trim()];
   return [];
+}
+
+function GiftSection({
+  card,
+  isSentView,
+  userId,
+}: {
+  card: Card | ReceivedCard;
+  isSentView: boolean;
+  userId?: string;
+}) {
+  const router = useRouter();
+  const { claimPayout, connectStatus, refreshGifts } = useGifts();
+  const [giftTx, setGiftTx] = useState<CardGiftTransaction | null>(null);
+  const [loadingGift, setLoadingGift] = useState(true);
+  const [claiming, setClaiming] = useState(false);
+  const [giftError, setGiftError] = useState('');
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadGift() {
+      setLoadingGift(true);
+      try {
+        let query = supabase.from('card_gifts').select('*').order('created_at', { ascending: false }).limit(1);
+
+        if (card.gift?.giftId) {
+          query = query.eq('id', card.gift.giftId);
+        } else {
+          query = query.eq('card_id', card.id);
+        }
+
+        const { data, error } = await query.maybeSingle();
+        if (!mounted) return;
+        if (error) throw error;
+        if (data) {
+          const direction =
+            data.sender_id === userId ? 'sent' : data.recipient_id === userId ? 'received' : 'received';
+          setGiftTx(mapGiftRow(data, direction));
+        }
+      } catch (error) {
+        console.warn('Failed to load gift transaction:', error);
+      } finally {
+        if (mounted) setLoadingGift(false);
+      }
+    }
+
+    loadGift();
+  }, [card.gift?.giftId, card.id, userId]);
+
+  const handleClaim = async () => {
+    if (!giftTx) return;
+    setClaiming(true);
+    setGiftError('');
+
+    const result = await claimPayout(giftTx.id);
+    if (result.needsOnboarding) {
+      setClaiming(false);
+      router.push('/gift-payout-setup');
+      return;
+    }
+
+    if (result.error) {
+      setGiftError(result.error);
+      setClaiming(false);
+      return;
+    }
+
+    await refreshGifts();
+    setGiftTx((prev) =>
+      prev ? { ...prev, status: 'payout_completed', payoutCompletedAt: new Date().toISOString() } : prev
+    );
+    setClaiming(false);
+  };
+
+  const canClaim =
+    !isSentView &&
+    giftTx &&
+    giftTx.recipientId === userId &&
+    (giftTx.status === 'paid' || giftTx.status === 'payout_failed');
+
+  return (
+    <View style={styles.giftCard}>
+      <MaterialIcons name="card-giftcard" size={32} color={theme.colors.primary} />
+      <Text style={styles.giftTitle}>Monetary Gift Included</Text>
+      <Text style={styles.giftAmount}>${card.gift?.amount.toFixed(2)}</Text>
+      {card.gift?.message ? <Text style={styles.giftMessage}>{card.gift.message}</Text> : null}
+
+      {loadingGift ? (
+        <Text style={styles.giftMeta}>Loading payment status…</Text>
+      ) : giftTx ? (
+        <Text style={styles.giftMeta}>{getGiftStatusLabel(giftTx.status)} · ${centsToDollars(giftTx.amountCents)}</Text>
+      ) : card.gift?.paymentStatus ? (
+        <Text style={styles.giftMeta}>{getGiftStatusLabel(card.gift.paymentStatus)}</Text>
+      ) : (
+        <Text style={styles.giftMeta}>Payment details unavailable</Text>
+      )}
+
+      {giftError ? <Text style={styles.giftError}>{giftError}</Text> : null}
+
+      {canClaim ? (
+        connectStatus.payoutsEnabled ? (
+          <Button
+            title={claiming ? 'Claiming…' : 'Claim Gift Payout'}
+            onPress={handleClaim}
+            variant="outline"
+            disabled={claiming}
+          />
+        ) : (
+          <Button title="Set Up Payout Account" onPress={() => router.push('/gift-payout-setup')} variant="outline" />
+        )
+      ) : (
+        <Button title="View Gift History" onPress={() => router.push('/gift-history')} variant="outline" />
+      )}
+    </View>
+  );
 }
 
 export default function CardDetailScreen() {
@@ -464,15 +586,7 @@ export default function CardDetailScreen() {
 
         {/* Gift */}
         {card.gift && (
-          <View style={styles.giftCard}>
-            <MaterialIcons name="card-giftcard" size={32} color={theme.colors.primary} />
-            <Text style={styles.giftTitle}>Gift Card Included</Text>
-            <Text style={styles.giftAmount}>${card.gift.amount}</Text>
-            {card.gift.message && (
-              <Text style={styles.giftMessage}>{card.gift.message}</Text>
-            )}
-            <Button title="View Gift" onPress={() => {}} variant="outline" />
-          </View>
+          <GiftSection card={card} isSentView={isSentView} userId={user?.id} />
         )}
 
         {/* Xo Button - Only for received cards */}
@@ -685,6 +799,18 @@ const styles = StyleSheet.create({
     color: theme.colors.mediumGray,
     textAlign: 'center',
     marginBottom: theme.spacing.md,
+  },
+  giftMeta: {
+    fontSize: 13,
+    color: theme.colors.mediumGray,
+    textAlign: 'center',
+    marginBottom: theme.spacing.sm,
+  },
+  giftError: {
+    fontSize: 13,
+    color: theme.colors.error,
+    textAlign: 'center',
+    marginBottom: theme.spacing.sm,
   },
   xoButton: {
     marginHorizontal: theme.spacing.lg,

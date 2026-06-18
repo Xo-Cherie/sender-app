@@ -79,7 +79,18 @@ npm run push:process-pending
 
 Push requires an **EAS device build** (not Expo Go or web). Configure FCM (Android) and APNs (iOS) in `npx eas-cli credentials`.
 
-### 6. Lint the Code
+### 6. Stripe Monetary Gifts
+
+See the full guide: [docs/stripe-payments.md](./docs/stripe-payments.md)
+
+```bash
+supabase db push --yes
+npm run gifts:deploy
+```
+
+Use Stripe **test** keys in Supabase secrets (`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`) and sandbox card `4242 4242 4242 4242`.
+
+### 7. Lint the Code
 
 ```bash
 npm run lint

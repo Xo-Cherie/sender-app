@@ -434,9 +434,15 @@ export default function DeviceCardViewer() {
             {card.gift && (
               <View style={styles.giftBox}>
                 <MaterialIcons name="card-giftcard" size={28} color={theme.colors.primary} />
-                <Text style={styles.giftTitle}>Gift Card Included</Text>
-                <Text style={styles.giftAmount}>${card.gift.amount}</Text>
+                <Text style={styles.giftTitle}>Monetary Gift Included</Text>
+                <Text style={styles.giftAmount}>${card.gift.amount.toFixed(2)}</Text>
                 {card.gift.message ? <Text style={styles.giftMsg}>{card.gift.message}</Text> : null}
+                {card.gift.paymentStatus ? (
+                  <Text style={styles.giftStatus}>Payment: {card.gift.paymentStatus}</Text>
+                ) : null}
+                <Text style={styles.giftHint}>
+                  Open the Xo Cherie mobile app to claim payout if you are the recipient.
+                </Text>
               </View>
             )}
 
@@ -600,6 +606,8 @@ const styles = StyleSheet.create({
   giftTitle: { fontSize: 15, fontWeight: '700', color: theme.colors.dark, marginTop: 8 },
   giftAmount: { fontSize: 32, fontWeight: '700', color: theme.colors.primary, marginVertical: 6 },
   giftMsg: { fontSize: 13, color: theme.colors.mediumGray, textAlign: 'center' },
+  giftStatus: { fontSize: 12, color: theme.colors.primary, marginTop: 8, fontWeight: '600' },
+  giftHint: { fontSize: 12, color: theme.colors.mediumGray, marginTop: 8, textAlign: 'center', lineHeight: 18 },
   voiceBox: {
     backgroundColor: theme.colors.white, borderRadius: theme.borderRadius.lg, padding: 16, gap: 10,
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 10, elevation: 2,

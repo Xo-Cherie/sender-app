@@ -460,6 +460,25 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.formSection}>
+          <SectionTitle icon="payments" title="Monetary Gifts" />
+          <Text style={styles.giftSectionDescription}>
+            Send gifts with cards using Stripe. Set up payouts to receive monetary gifts from friends.
+          </Text>
+          <Button
+            title="Gift Transaction History"
+            onPress={() => router.push('/gift-history')}
+            variant="outline"
+            style={styles.giftSectionButton}
+          />
+          <Button
+            title="Set Up Gift Payouts"
+            onPress={() => router.push('/gift-payout-setup')}
+            variant="outline"
+            style={styles.giftSectionButton}
+          />
+        </View>
+
+        <View style={styles.formSection}>
           <SectionTitle icon="lock-outline" title="Privacy Settings" />
           <ToggleRow
             label="Show Email to Friends"
@@ -690,6 +709,15 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: theme.colors.dark,
     fontFamily: theme.fonts.serif,
+  },
+  giftSectionDescription: {
+    fontSize: 13,
+    color: theme.colors.mediumGray,
+    lineHeight: 18,
+    marginBottom: theme.spacing.md,
+  },
+  giftSectionButton: {
+    marginBottom: theme.spacing.sm,
   },
   field: {
     marginBottom: theme.spacing.md,

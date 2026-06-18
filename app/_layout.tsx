@@ -33,6 +33,9 @@ export default function RootLayout() {
               headerBackTitle: 'Cancel',
             }} 
           />
+          <Stack.Screen name="gift-payment" options={{ headerShown: true, title: 'Gift Payment' }} />
+          <Stack.Screen name="gift-history" options={{ headerShown: false }} />
+          <Stack.Screen name="gift-payout-setup" options={{ headerShown: true, title: 'Payout Setup' }} />
           </Stack>
         </PushNotificationProvider>
       </AuthProvider>

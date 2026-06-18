@@ -381,6 +381,10 @@ export function useCards() {
         throw new Error('Add at least one accepted friend or a recipient email before sending.');
       }
 
+      if (card.gift?.giftId && card.gift.paymentStatus !== 'paid') {
+        throw new Error('Monetary gifts must be paid before the card can be sent.');
+      }
+
       // Always store front_design_url as a template reference so it can be resolved on any platform
       const frontDesignUrl = `template:${card.templateId}`;
 
@@ -426,6 +430,21 @@ export function useCards() {
 
       if (inviteErrors.length > 0) {
         throw new Error(`Card was saved, but invite delivery failed. ${inviteErrors.join(' ')}`);
+      }
+
+      if (card.gift?.giftId && cardData?.id) {
+        const primaryRecipientId = validRecipientIds[0];
+        const { error: linkError } = await invokeEdgeFunction('link-gift-to-card', {
+          body: {
+            giftId: card.gift.giftId,
+            cardId: cardData.id,
+            recipientId: primaryRecipientId,
+          },
+        });
+
+        if (linkError) {
+          throw new Error(`Card sent, but gift link failed: ${await getFunctionErrorMessage(linkError)}`);
+        }
       }
 
       // Reload cards to get updated data

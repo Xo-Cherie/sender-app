@@ -27,6 +27,15 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { FlipCard } from '@/components/cards/FlipCard';
 import { VoiceMemoRecorder } from '@/components/cards/VoiceMemoRecorder';
+import {
+  createGiftPayment,
+  dollarsToCents,
+  isStripeConfigured,
+  openStripeCheckout,
+  validateGiftAmount,
+  verifyGiftPayment,
+} from '@/lib/gifts';
+import { savePendingCardSend } from '@/lib/pendingCardSend';
 
 type Step = 'category' | 'template' | 'recipients' | 'message' | 'media' | 'gift' | 'preview';
 
@@ -168,14 +177,17 @@ export default function CreateCardScreen() {
       const recipientIds: string[] = [];
       const recipientNames: string[] = [];
       const recipientEmails: string[] = [];
+      let primaryRecipientUserId: string | undefined;
 
       selectedRecipients.forEach(id => {
         const friend = friends.find(f => f.id === id);
         if (friend) {
-          // Use userId (actual user profile ID) for accepted friends, fall back to id
           const actualUserId = friend.userId || friend.id;
           recipientIds.push(actualUserId);
           recipientNames.push(friend.name);
+          if (!primaryRecipientUserId && !actualUserId.startsWith('custom-')) {
+            primaryRecipientUserId = actualUserId;
+          }
         }
       });
 
@@ -187,8 +199,98 @@ export default function CreateCardScreen() {
         recipientEmails.push(normalizedEmail);
       }
 
-      // Always store as template reference - resolves correctly on load for both local and remote images
       const frontImageUrl = `template:${selectedTemplate_data.id}`;
+
+      let resolvedGift: Gift | null = gift;
+
+      if (gift && gift.amount > 0) {
+        if (!isStripeConfigured()) {
+          throw new Error('Stripe payments are not enabled in this environment.');
+        }
+
+        const amountError = validateGiftAmount(gift.amount);
+        if (amountError) {
+          throw new Error(amountError);
+        }
+
+        const totalRecipients =
+          recipientIds.filter((id) => !id.startsWith('custom-')).length + recipientEmails.length;
+        if (totalRecipients !== 1) {
+          throw new Error('Monetary gifts can only be sent to one recipient at a time.');
+        }
+
+        const { data: paymentData, error: paymentError } = await createGiftPayment({
+          amountCents: dollarsToCents(gift.amount),
+          recipientId: primaryRecipientUserId,
+          recipientEmail: recipientEmails[0],
+          giftMessage: gift.message,
+        });
+
+        if (paymentError || !paymentData?.checkoutUrl || !paymentData.giftId) {
+          throw new Error(
+            paymentError?.message ||
+              (typeof paymentData === 'object' && paymentData && 'error' in paymentData
+                ? String((paymentData as { error?: string }).error)
+                : 'Could not start gift payment')
+          );
+        }
+
+        const cardDraft: Card = {
+          id: 'card-' + Date.now(),
+          senderId: user.id,
+          senderName: cardSenderDisplayName,
+          recipientIds,
+          recipientNames,
+          senderDisplayName: cardSenderDisplayName,
+          recipientDisplayName: cardRecipientDisplayName,
+          recipientEmails,
+          category: selectedTemplate_data.category,
+          templateId: selectedTemplate_data.id,
+          frontImage: frontImageUrl,
+          personalMessage: personalMessage || selectedTemplate_data.backMessage,
+          mediaAttachments,
+          gift: {
+            ...gift,
+            giftId: paymentData.giftId,
+            paymentStatus: 'pending',
+          },
+          createdAt: new Date().toISOString(),
+          status: 'sent',
+        };
+
+        await savePendingCardSend({
+          giftId: paymentData.giftId,
+          card: cardDraft,
+          primaryRecipientId: primaryRecipientUserId,
+        });
+
+        if (Platform.OS === 'web') {
+          await openStripeCheckout(paymentData.checkoutUrl, paymentData.giftId);
+          return;
+        }
+
+        const browserResult = await openStripeCheckout(paymentData.checkoutUrl, paymentData.giftId);
+        if (browserResult.type !== 'success') {
+          throw new Error('Gift payment was canceled.');
+        }
+
+        const { data: verified, error: verifyError } = await verifyGiftPayment({
+          giftId: paymentData.giftId,
+        });
+
+        if (verifyError || verified?.status !== 'paid') {
+          throw new Error(
+            verifyError?.message ||
+              `Gift payment was not completed (status: ${verified?.status || 'unknown'}).`
+          );
+        }
+
+        resolvedGift = {
+          ...gift,
+          giftId: paymentData.giftId,
+          paymentStatus: 'paid',
+        };
+      }
 
       const card: Card = {
         id: 'card-' + Date.now(),
@@ -204,7 +306,7 @@ export default function CreateCardScreen() {
         frontImage: frontImageUrl,
         personalMessage: personalMessage || selectedTemplate_data.backMessage,
         mediaAttachments,
-        gift: gift || undefined,
+        gift: resolvedGift || undefined,
         createdAt: new Date().toISOString(),
         status: 'sent',
       };
@@ -476,10 +578,14 @@ export default function CreateCardScreen() {
         {/* Gift */}
         {step === 'gift' && (
           <View style={styles.stepContainer}>
-            <Text style={styles.stepTitle}>Include a Gift Card (Optional)</Text>
+            <Text style={styles.stepTitle}>Include a Monetary Gift (Optional)</Text>
+            <Text style={styles.giftHelpText}>
+              Gifts are charged securely with Stripe. Only one recipient is allowed when sending money.
+              Minimum $0.50.
+            </Text>
             <Input
               name="gift-amount"
-              label="Amount"
+              label="Amount (USD)"
               placeholder="Enter amount (e.g., 25)"
               value={giftAmount}
               onChangeText={setGiftAmount}
@@ -487,14 +593,32 @@ export default function CreateCardScreen() {
             />
             {giftAmount.trim() && (
               <Button
-                title={`Add $${giftAmount} Gift Card`}
+                title={`Add $${giftAmount} Gift`}
                 onPress={() => {
+                  const amount = parseFloat(giftAmount);
+                  const validationError = validateGiftAmount(amount);
+                  if (validationError) {
+                    if (Platform.OS === 'web') {
+                      alert(validationError);
+                    } else {
+                      Alert.alert('Invalid amount', validationError);
+                    }
+                    return;
+                  }
                   setGift({
-                    amount: parseFloat(giftAmount),
-                    message: 'Enjoy!',
+                    amount,
+                    message: 'Enjoy your gift!',
                   });
                 }}
               />
+            )}
+            {gift && (
+              <View style={styles.giftAddedBanner}>
+                <MaterialIcons name="payments" size={20} color={theme.colors.primary} />
+                <Text style={styles.giftAddedText}>
+                  ${gift.amount.toFixed(2)} gift will be charged at checkout when you send the card.
+                </Text>
+              </View>
             )}
           </View>
         )}
@@ -642,6 +766,27 @@ const styles = StyleSheet.create({
     color: theme.colors.dark,
     marginBottom: theme.spacing.lg,
     fontFamily: theme.fonts.serif,
+  },
+  giftHelpText: {
+    fontSize: 14,
+    color: theme.colors.mediumGray,
+    lineHeight: 20,
+    marginBottom: theme.spacing.md,
+  },
+  giftAddedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: theme.spacing.md,
+    padding: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: theme.colors.primaryLight,
+  },
+  giftAddedText: {
+    flex: 1,
+    fontSize: 14,
+    color: theme.colors.primaryDark,
+    fontWeight: '600',
   },
   categoryGrid: {
     gap: theme.spacing.md,

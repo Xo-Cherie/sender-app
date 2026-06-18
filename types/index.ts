@@ -38,9 +38,48 @@ export interface MediaAttachment {
   mimeType?: string;
 }
 
+export type GiftPaymentStatus =
+  | 'pending'
+  | 'processing'
+  | 'paid'
+  | 'failed'
+  | 'canceled'
+  | 'refunded'
+  | 'payout_pending'
+  | 'payout_completed'
+  | 'payout_failed';
+
 export interface Gift {
   amount: number;
   message: string;
+  giftId?: string;
+  paymentStatus?: GiftPaymentStatus;
+  payoutStatus?: GiftPaymentStatus;
+}
+
+export interface CardGiftTransaction {
+  id: string;
+  cardId?: string;
+  senderId: string;
+  recipientId?: string;
+  recipientEmail?: string;
+  amountCents: number;
+  currency: string;
+  giftMessage?: string;
+  status: GiftPaymentStatus;
+  failureReason?: string;
+  paidAt?: string;
+  claimedAt?: string;
+  payoutCompletedAt?: string;
+  createdAt: string;
+  direction: 'sent' | 'received';
+}
+
+export interface StripeConnectStatus {
+  connectAccountId?: string;
+  onboardingComplete: boolean;
+  payoutsEnabled: boolean;
+  detailsSubmitted: boolean;
 }
 
 export interface RecipientDeliveryStatus {

@@ -11,3 +11,21 @@ verify_jwt = true
 
 [functions.invite-friend]
 verify_jwt = true
+
+[functions.create-gift-payment]
+verify_jwt = true
+
+[functions.verify-gift-payment]
+verify_jwt = true
+
+[functions.stripe-webhook]
+verify_jwt = false
+
+[functions.create-connect-onboarding]
+verify_jwt = true
+
+[functions.claim-gift-payout]
+verify_jwt = true
+
+[functions.link-gift-to-card]
+verify_jwt = true
