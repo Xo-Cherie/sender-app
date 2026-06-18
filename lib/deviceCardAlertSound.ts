@@ -26,6 +26,7 @@ export async function prepareDeviceCardAlertSound() {
 
   if (!alertPlayer) {
     alertPlayer = createAudioPlayer(CARD_ARRIVAL_SOUND);
+    alertPlayer.volume = 1;
   }
 }
 
@@ -42,6 +43,7 @@ export async function playDeviceCardArrivalSound() {
     }
 
     await alertPlayer.seekTo(0);
+    alertPlayer.volume = 1;
     alertPlayer.play();
   } catch (error) {
     console.warn('Device card alert sound failed:', error);

@@ -16,6 +16,7 @@ import { useCards } from '@/hooks/useCards';
 import { normalizeCardFrontImage, getCardImageSource } from '@/lib/cardImages';
 import { supabase } from '@/lib/supabase';
 import { alertDeviceNewCard } from '@/lib/notifications';
+import { playDeviceCardArrivalSound } from '@/lib/deviceCardAlertSound';
 
 export default function DeviceHome() {
   const router = useRouter();
@@ -89,6 +90,20 @@ export default function DeviceHome() {
             </Text>
           )}
         </View>
+
+        {__DEV__ && (
+          <Pressable
+            style={styles.testSoundBtn}
+            onPress={() => {
+              playDeviceCardArrivalSound().catch((error) => {
+                console.warn('Test card alert sound failed:', error);
+              });
+            }}
+          >
+            <MaterialIcons name="volume-up" size={18} color={theme.colors.primary} />
+            <Text style={styles.testSoundText}>Test arrival sound</Text>
+          </Pressable>
+        )}
 
         {/* Quick stats */}
         <View style={styles.statsRow}>
@@ -276,6 +291,20 @@ const styles = StyleSheet.create({
   newCardsText: { fontSize: 14, color: theme.colors.primaryDark, fontWeight: '500' },
   newCardsCount: { fontWeight: '800', color: theme.colors.primary },
   noNewCards: { fontSize: 14, color: theme.colors.mediumGray, marginTop: 4 },
+  testSoundBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    alignSelf: 'flex-start',
+    marginTop: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: theme.borderRadius.full,
+    borderWidth: 1,
+    borderColor: theme.colors.primary,
+    backgroundColor: theme.colors.white,
+  },
+  testSoundText: { fontSize: 13, fontWeight: '600', color: theme.colors.primary },
   statsRow: { flexDirection: 'row', gap: 12 },
   statCard: {
     flex: 1, backgroundColor: theme.colors.cream, borderRadius: theme.borderRadius.md,

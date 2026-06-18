@@ -9,6 +9,7 @@ import {
   getRouteFromNotificationData,
   parseNotificationData,
   registerPushTokenForUser,
+  supportsRemotePushNotifications,
 } from '@/lib/notifications';
 
 export function PushNotificationProvider({ children }: { children: React.ReactNode }) {
@@ -30,7 +31,7 @@ export function PushNotificationProvider({ children }: { children: React.ReactNo
   }, []);
 
   useEffect(() => {
-    if (Platform.OS === 'web') return;
+    if (Platform.OS === 'web' || !supportsRemotePushNotifications()) return;
 
     if (loading || !user?.id) {
       lastRegisteredUserIdRef.current = null;

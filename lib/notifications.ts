@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Constants from 'expo-constants';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
@@ -46,6 +46,15 @@ function getAppVariant(): 'main' | 'device' {
   return 'main';
 }
 
+function isExpoGo(): boolean {
+  return Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+}
+
+export function supportsRemotePushNotifications(): boolean {
+  if (Platform.OS === 'web' || isExpoGo()) return false;
+  return true;
+}
+
 function getEasProjectId(): string | undefined {
   return Constants.expoConfig?.extra?.eas?.projectId;
 }
@@ -87,7 +96,7 @@ export async function alertDeviceNewCard(options: {
   title?: string;
   body?: string;
 }) {
-  if (getAppVariant() !== 'device' || Platform.OS === 'web') return;
+  if (Platform.OS === 'web') return;
 
   const cardId = options.cardId.trim();
   if (!cardId || recentDeviceCardAlerts.has(cardId)) return;
@@ -145,7 +154,9 @@ export async function requestPushPermissions(): Promise<boolean> {
 }
 
 export async function getExpoPushToken(): Promise<string | null> {
-  if (Platform.OS === 'web' || !Device.isDevice) return null;
+  if (Platform.OS === 'web' || !Device.isDevice || !supportsRemotePushNotifications()) {
+    return null;
+  }
 
   const granted = await requestPushPermissions();
   if (!granted) return null;
