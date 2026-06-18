@@ -6,7 +6,6 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { AuthProvider } from '@/contexts/AuthContext';
-import { PushNotificationProvider } from '@/components/PushNotificationProvider';
 import { useAuth } from '@/hooks/useAuth';
 import { useUnreadCount } from '@/hooks/useUnreadCount';
 import { theme } from '@/constants/theme';
@@ -151,14 +150,12 @@ export default function DeviceLayout() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
-        <PushNotificationProvider>
           <StatusBar style="dark" />
           <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.cream }} edges={['top', 'bottom']}>
             <DeviceShell>
               <Stack screenOptions={{ headerShown: false }} />
             </DeviceShell>
           </SafeAreaView>
-        </PushNotificationProvider>
       </AuthProvider>
     </SafeAreaProvider>
   );
