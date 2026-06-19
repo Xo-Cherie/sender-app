@@ -20,6 +20,16 @@ export function getStripeSecretKey(): string {
   if (!key) {
     throw new Error('STRIPE_SECRET_KEY is not configured');
   }
+  if (key.startsWith('pk_')) {
+    throw new Error(
+      'STRIPE_SECRET_KEY is set to a publishable key (pk_). Use the secret key (sk_test_... or sk_live_...) from Stripe Dashboard → Developers → API keys.'
+    );
+  }
+  if (!key.startsWith('sk_')) {
+    throw new Error(
+      'STRIPE_SECRET_KEY must start with sk_test_ or sk_live_. Check the value in Supabase → Project Settings → Edge Functions → Secrets.'
+    );
+  }
   return key;
 }
 

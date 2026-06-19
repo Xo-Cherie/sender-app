@@ -2,6 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
 import {
   corsHeaders,
   getAppUrl,
+  getStripeSecretKey,
   jsonResponse,
   mapCheckoutPaymentStatus,
   stripeRequest,
@@ -30,6 +31,22 @@ Deno.serve(async (req) => {
 
   if (req.method !== 'POST') {
     return jsonResponse({ error: 'Method not allowed' }, 405);
+  }
+
+  try {
+    getStripeSecretKey();
+  } catch (configError) {
+    const message =
+      configError instanceof Error
+        ? configError.message
+        : 'STRIPE_SECRET_KEY is not configured';
+    return jsonResponse(
+      {
+        error: `${message} After updating secrets, redeploy with: npm run gifts:deploy`,
+        code: 'STRIPE_NOT_CONFIGURED',
+      },
+      503
+    );
   }
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
@@ -110,7 +127,11 @@ Deno.serve(async (req) => {
     .single();
 
   if (giftInsertError || !giftRow) {
-    return jsonResponse({ error: giftInsertError?.message || 'Could not create gift record' }, 500);
+    const message = giftInsertError?.message || 'Could not create gift record';
+    const hint = message.includes('card_gifts')
+      ? ' Run supabase db push to create the card_gifts table.'
+      : '';
+    return jsonResponse({ error: `${message}${hint}` }, 500);
   }
 
   const appUrl = getAppUrl();

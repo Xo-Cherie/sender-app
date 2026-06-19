@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Card, ReceivedCard, RecipientDeliveryStatus } from '@/types';
 import { supabase } from '@/lib/supabase';
-import { invokeEdgeFunction } from '@/lib/edgeFunctions';
+import { invokeEdgeFunction, getEdgeFunctionErrorMessage } from '@/lib/edgeFunctions';
 import { claimInvitedCardsForSession } from '@/lib/claimInvitedCards';
 import { useAuth } from './useAuth';
 import { CardCategory, cardTemplates } from '@/constants/cardTemplates';
@@ -51,28 +51,7 @@ function normalizeEmail(value: unknown): string {
 }
 
 async function getFunctionErrorMessage(error: any): Promise<string> {
-  const fallbackMessage = error?.message || 'Request failed';
-  const response = error?.context;
-
-  if (!response || typeof response.clone !== 'function') {
-    return fallbackMessage;
-  }
-
-  try {
-    const body = await response.clone().json();
-    if (typeof body?.error === 'string' && body.error.trim()) {
-      return body.error;
-    }
-  } catch {
-    try {
-      const text = await response.clone().text();
-      if (text.trim()) return text;
-    } catch {
-      // Fall back below.
-    }
-  }
-
-  return fallbackMessage;
+  return getEdgeFunctionErrorMessage(error, error?.message || 'Request failed');
 }
 
 export function useCards() {

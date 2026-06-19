@@ -35,6 +35,7 @@ import {
   validateGiftAmount,
   verifyGiftPayment,
 } from '@/lib/gifts';
+import { getEdgeFunctionErrorMessage } from '@/lib/edgeFunctions';
 import { savePendingCardSend } from '@/lib/pendingCardSend';
 
 type Step = 'category' | 'template' | 'recipients' | 'message' | 'media' | 'gift' | 'preview';
@@ -228,10 +229,12 @@ export default function CreateCardScreen() {
 
         if (paymentError || !paymentData?.checkoutUrl || !paymentData.giftId) {
           throw new Error(
-            paymentError?.message ||
-              (typeof paymentData === 'object' && paymentData && 'error' in paymentData
+            await getEdgeFunctionErrorMessage(
+              paymentError,
+              typeof paymentData === 'object' && paymentData && 'error' in paymentData
                 ? String((paymentData as { error?: string }).error)
-                : 'Could not start gift payment')
+                : 'Could not start gift payment'
+            )
           );
         }
 

@@ -10,23 +10,19 @@ type InvokeResult<T> = {
   error: any | null;
 };
 
-function getFunctionsUrlOverride() {
-  const rawUrl = process.env.EXPO_PUBLIC_SUPABASE_FUNCTIONS_URL?.trim();
-  if (!rawUrl) return undefined;
-
-  const normalizedUrl = rawUrl.replace(/\/$/, '');
+function getFunctionsBaseUrl() {
+  const override = process.env.EXPO_PUBLIC_SUPABASE_FUNCTIONS_URL?.trim();
+  let baseUrl = (override || `${supabaseUrl}/functions/v1`).replace(/\/$/, '');
 
   if (Platform.OS === 'android') {
-    return normalizedUrl.replace(
+    baseUrl = baseUrl.replace(
       /^(https?:\/\/)(localhost|127\.0\.0\.1)(?=[:/])/,
       (_match, protocol) => `${protocol}10.0.2.2`
     );
   }
 
-  return normalizedUrl;
+  return baseUrl;
 }
-
-const functionsUrlOverride = getFunctionsUrlOverride();
 
 function createFunctionError(message: string, response?: Response) {
   const error = new Error(message) as Error & { context?: Response };
@@ -36,14 +32,43 @@ function createFunctionError(message: string, response?: Response) {
   return error;
 }
 
+export async function getEdgeFunctionErrorMessage(error: any, fallback = 'Request failed'): Promise<string> {
+  if (!error) return fallback;
+
+  const response = error.context as Response | undefined;
+  if (response && typeof response.clone === 'function') {
+    try {
+      const body = await response.clone().json();
+      if (typeof body?.error === 'string' && body.error.trim()) {
+        return body.error;
+      }
+      if (typeof body?.message === 'string' && body.message.trim()) {
+        return body.message;
+      }
+    } catch {
+      try {
+        const text = await response.clone().text();
+        if (text.trim()) return text;
+      } catch {
+        // Fall through.
+      }
+    }
+  }
+
+  if (typeof error.message === 'string' && error.message.trim()) {
+    if (error.message.includes('non-2xx status code') && error.context) {
+      return await getEdgeFunctionErrorMessage({ context: error.context }, fallback);
+    }
+    return error.message;
+  }
+
+  return fallback;
+}
+
 export async function invokeEdgeFunction<T = unknown>(
   functionName: string,
   options: InvokeOptions = {}
 ): Promise<InvokeResult<T>> {
-  if (!functionsUrlOverride) {
-    return supabase.functions.invoke<T>(functionName, options);
-  }
-
   const { data: sessionData } = await supabase.auth.getSession();
   const accessToken = sessionData.session?.access_token;
 
@@ -54,8 +79,10 @@ export async function invokeEdgeFunction<T = unknown>(
     };
   }
 
+  const baseUrl = getFunctionsBaseUrl();
+
   try {
-    const response = await fetch(`${functionsUrlOverride}/${functionName}`, {
+    const response = await fetch(`${baseUrl}/${functionName}`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -77,9 +104,10 @@ export async function invokeEdgeFunction<T = unknown>(
     }
 
     if (!response.ok) {
-      const message = typeof data === 'object' && data && 'error' in data
-        ? String((data as { error?: unknown }).error)
-        : `Edge Function returned ${response.status}`;
+      const message =
+        typeof data === 'object' && data && 'error' in data
+          ? String((data as { error?: unknown }).error)
+          : text?.trim() || `Edge Function returned ${response.status}`;
 
       return {
         data,
@@ -89,13 +117,12 @@ export async function invokeEdgeFunction<T = unknown>(
 
     return { data, error: null };
   } catch (error: any) {
-    const message = functionsUrlOverride
-      ? `Could not reach Edge Function at ${functionsUrlOverride}. Make sure Supabase functions are running and reachable from this device.`
-      : error.message || 'Could not reach Edge Function';
-
     return {
       data: null,
-      error: createFunctionError(message),
+      error: createFunctionError(
+        error?.message ||
+          `Could not reach Edge Function at ${baseUrl}/${functionName}. Deploy it with npm run gifts:deploy or check your network.`
+      ),
     };
   }
 }
