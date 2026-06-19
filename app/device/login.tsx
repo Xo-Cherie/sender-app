@@ -14,18 +14,32 @@ import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { theme } from '@/constants/theme';
 import { useAuth } from '@/hooks/useAuth';
+import { requestPushPermissions, registerPushTokenForUser } from '@/lib/notifications';
+import { supabase } from '@/lib/supabase';
+
+type DeviceAuthMode = 'signIn' | 'signUp' | 'verify' | 'forgotPassword';
+
+async function completeDeviceSignIn() {
+  const { data } = await supabase.auth.getSession();
+  const userId = data.session?.user?.id;
+  if (!userId) return;
+
+  await requestPushPermissions();
+  await registerPushTokenForUser(userId);
+}
 
 export default function DeviceLogin() {
   const router = useRouter();
-  const { signIn, signUp, verifyOtp } = useAuth();
+  const { signIn, signUp, verifyOtp, requestPasswordReset } = useAuth();
 
-  const [mode, setMode] = useState<'signIn' | 'signUp' | 'verify'>('signIn');
+  const [mode, setMode] = useState<DeviceAuthMode>('signIn');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [resetSent, setResetSent] = useState(false);
 
   const handleSignIn = async () => {
     if (!email.trim() || !password.trim()) { setError('Email and password are required'); return; }
@@ -37,6 +51,7 @@ export default function DeviceLogin() {
       router.replace({ pathname: '/device/mfa-verify', params: { next: '/device/inbox' } });
       return;
     }
+    await completeDeviceSignIn();
     router.replace('/device/inbox');
   };
 
@@ -56,7 +71,17 @@ export default function DeviceLogin() {
     const { error: err } = await verifyOtp(email.trim(), otp.trim());
     setLoading(false);
     if (err) { setError(err); return; }
+    await completeDeviceSignIn();
     router.replace('/device/inbox');
+  };
+
+  const handleForgotPassword = async () => {
+    if (!email.trim()) { setError('Enter your email address first'); return; }
+    setLoading(true); setError(''); setResetSent(false);
+    const { error: err } = await requestPasswordReset(email.trim());
+    setLoading(false);
+    if (err) { setError(err); return; }
+    setResetSent(true);
   };
 
   return (
@@ -92,6 +117,30 @@ export default function DeviceLogin() {
               {error ? <Text style={styles.error}>{error}</Text> : null}
               <Pressable style={styles.btn} onPress={handleVerify} disabled={loading}>
                 {loading ? <ActivityIndicator color={theme.colors.white} /> : <Text style={styles.btnText}>Verify &amp; Open Device</Text>}
+              </Pressable>
+            </>
+          ) : mode === 'forgotPassword' ? (
+            <>
+              <Text style={styles.cardTitle}>Reset your password</Text>
+              <Text style={styles.cardDesc}>Enter your account email and we&apos;ll send a reset link.</Text>
+              <View style={styles.field}>
+                <Text style={styles.label}>Email</Text>
+                <TextInput
+                  style={styles.input}
+                  value={email}
+                  onChangeText={setEmail}
+                  placeholder="you@example.com"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+              </View>
+              {error ? <Text style={styles.error}>{error}</Text> : null}
+              {resetSent ? <Text style={styles.success}>Reset link sent! Check your email.</Text> : null}
+              <Pressable style={styles.btn} onPress={handleForgotPassword} disabled={loading}>
+                {loading ? <ActivityIndicator color={theme.colors.white} /> : <Text style={styles.btnText}>Send Reset Link</Text>}
+              </Pressable>
+              <Pressable onPress={() => { setMode('signIn'); setError(''); setResetSent(false); }} style={styles.forgotBack}>
+                <Text style={styles.forgotBackText}>Back to Sign In</Text>
               </Pressable>
             </>
           ) : (
@@ -137,6 +186,12 @@ export default function DeviceLogin() {
                   autoComplete={mode === 'signIn' ? 'current-password' : 'new-password'}
                 />
               </View>
+
+              {mode === 'signIn' ? (
+                <Pressable onPress={() => { setMode('forgotPassword'); setError(''); setResetSent(false); }} style={styles.forgotLinkWrap}>
+                  <Text style={styles.forgotLink}>Forgot Password?</Text>
+                </Pressable>
+              ) : null}
 
               {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -281,6 +336,30 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.errorLight,
     padding: 10,
     borderRadius: theme.borderRadius.sm,
+  },
+  success: {
+    fontSize: 13,
+    color: theme.colors.success,
+    marginBottom: 12,
+    fontWeight: '600',
+  },
+  forgotLinkWrap: {
+    alignSelf: 'flex-end',
+    marginBottom: 8,
+  },
+  forgotLink: {
+    fontSize: 13,
+    color: theme.colors.primary,
+    fontWeight: '600',
+  },
+  forgotBack: {
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  forgotBackText: {
+    fontSize: 14,
+    color: theme.colors.primary,
+    fontWeight: '600',
   },
   btn: {
     backgroundColor: theme.colors.primary,

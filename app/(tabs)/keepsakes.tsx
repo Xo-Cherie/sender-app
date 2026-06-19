@@ -5,8 +5,9 @@ import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { theme } from '@/constants/theme';
 import { useCards } from '@/hooks/useCards';
-import { CardPreview } from '@/components/cards/CardPreview';
 import { Input } from '@/components/ui/Input';
+import { CardTimelineItem } from '@/components/cards/CardTimelineItem';
+import { formatCardTimelineDate, getMessagePreview } from '@/lib/cardMessageUtils';
 
 export default function KeepsakesScreen() {
   const router = useRouter();
@@ -62,13 +63,16 @@ export default function KeepsakesScreen() {
             <Text style={styles.emptyTitle}>No matches</Text>
           </View>
         ) : (
-          <View style={styles.grid}>
+          <View style={styles.timeline}>
             {filteredKeepsakes.map(card => (
-              <CardPreview
+              <CardTimelineItem
                 key={card.id}
-                card={card}
+                dateLabel={formatCardTimelineDate(card.createdAt)}
+                direction="From"
+                personName={card.senderName}
+                messagePreview={getMessagePreview(card.personalMessage)}
+                giftAmount={card.gift?.amount}
                 onPress={() => router.push(`/card-detail?id=${card.id}`)}
-                showBadge={false}
               />
             ))}
           </View>
@@ -116,9 +120,7 @@ const styles = StyleSheet.create({
   searchInput: {
     paddingLeft: 40,
   },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  timeline: {
     paddingHorizontal: theme.spacing.lg,
     gap: theme.spacing.md,
   },

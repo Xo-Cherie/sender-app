@@ -35,6 +35,8 @@ interface AuthContextType {
   verifyMfaEnrollment: (factorId: string, code: string) => Promise<{ error: string | null }>;
   verifyMfaChallenge: (code: string) => Promise<{ error: string | null }>;
   disableMfa: (factorId?: string) => Promise<{ error: string | null }>;
+  requestPasswordReset: (email: string) => Promise<{ error: string | null }>;
+  updatePassword: (newPassword: string) => Promise<{ error: string | null }>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -478,6 +480,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  async function requestPasswordReset(email: string) {
+    try {
+      const normalizedEmail = email.trim();
+      if (!normalizedEmail) {
+        return { error: 'Email is required' };
+      }
+
+      const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
+        redirectTo: getAuthRedirectUrl(),
+      });
+
+      if (error) return { error: error.message };
+      return { error: null };
+    } catch (error: any) {
+      return { error: error.message || 'Could not send reset email' };
+    }
+  }
+
+  async function updatePassword(newPassword: string) {
+    try {
+      if (newPassword.length < 6) {
+        return { error: 'Password must be at least 6 characters' };
+      }
+
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) return { error: error.message };
+      return { error: null };
+    } catch (error: any) {
+      return { error: error.message || 'Could not update password' };
+    }
+  }
+
   return (
     <AuthContext.Provider
       value={{
@@ -496,6 +530,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         verifyMfaEnrollment,
         verifyMfaChallenge,
         disableMfa,
+        requestPasswordReset,
+        updatePassword,
       }}
     >
       {children}

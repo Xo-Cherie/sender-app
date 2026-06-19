@@ -4,6 +4,7 @@ import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { playDeviceCardArrivalSound } from '@/lib/deviceCardAlertSound';
+import { emitDeviceNewCardAlert } from '@/lib/deviceCardAlerts';
 import { invokeEdgeFunction } from '@/lib/edgeFunctions';
 
 export type PushNotificationType = 'card_received' | 'friend_request' | 'xo_received';
@@ -96,13 +97,19 @@ export async function alertDeviceNewCard(options: {
   title?: string;
   body?: string;
 }) {
-  if (Platform.OS === 'web') return;
-
   const cardId = options.cardId.trim();
   if (!cardId || recentDeviceCardAlerts.has(cardId)) return;
 
   recentDeviceCardAlerts.add(cardId);
   setTimeout(() => recentDeviceCardAlerts.delete(cardId), DEVICE_CARD_ALERT_DEDUPE_MS);
+
+  const title = options.title ?? 'New card received';
+  const body = options.body ?? 'A new card has arrived on your Cherie Device';
+
+  if (Platform.OS === 'web') {
+    emitDeviceNewCardAlert({ cardId, title, body });
+    return;
+  }
 
   await ensureAndroidNotificationChannel();
   await playDeviceCardArrivalSound();
@@ -110,8 +117,8 @@ export async function alertDeviceNewCard(options: {
   try {
     await Notifications.scheduleNotificationAsync({
       content: {
-        title: options.title ?? 'New card received',
-        body: options.body ?? 'A new card has arrived on your Cherie Device',
+        title,
+        body,
         sound: CARD_ARRIVAL_SOUND,
         priority: Notifications.AndroidNotificationPriority.MAX,
         data: {

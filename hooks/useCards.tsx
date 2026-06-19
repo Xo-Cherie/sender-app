@@ -1,4 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, createContext, useContext, ReactNode } from 'react';
+import { AppState, Platform } from 'react-native';
+import Constants from 'expo-constants';
 import { Card, ReceivedCard, RecipientDeliveryStatus } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { invokeEdgeFunction, getEdgeFunctionErrorMessage } from '@/lib/edgeFunctions';
@@ -6,6 +8,8 @@ import { claimInvitedCardsForSession } from '@/lib/claimInvitedCards';
 import { useAuth } from './useAuth';
 import { CardCategory, cardTemplates } from '@/constants/cardTemplates';
 import { resolveCardFrontImage } from '@/lib/cardImages';
+import { sanitizeMediaAttachmentsForStorage } from '@/lib/uploadMedia';
+import { alertDeviceNewCard } from '@/lib/notifications';
 
 // Helper to validate UUID format
 function isValidUUID(str: string): boolean {
@@ -54,12 +58,73 @@ async function getFunctionErrorMessage(error: any): Promise<string> {
   return getEdgeFunctionErrorMessage(error, error?.message || 'Request failed');
 }
 
-export function useCards() {
+function isDeviceAppVariant(): boolean {
+  return Constants.expoConfig?.extra?.appVariant === 'device';
+}
+
+function buildDeliveryStatuses(
+  storedRecipientIds: string[],
+  storedRecipientNames: string[],
+  recipients: Array<{ recipient_id: string; is_read?: boolean; acknowledged_at?: string | null }>,
+  recipientProfileById: Map<string, ProfileRow>
+): RecipientDeliveryStatus[] {
+  const deliveredById = new Map(recipients.map((row) => [row.recipient_id, row]));
+  const statuses: RecipientDeliveryStatus[] = [];
+
+  storedRecipientIds.filter((recipientId) => isValidUUID(recipientId)).forEach((recipientId, index) => {
+    const row = deliveredById.get(recipientId);
+    statuses.push({
+      recipientId,
+      recipientName:
+        storedRecipientNames[index] ||
+        formatProfileName(recipientProfileById.get(recipientId)) ||
+        'Recipient',
+      isDelivered: !!row,
+      isRead: row?.is_read || false,
+      isXod: !!row?.acknowledged_at,
+    });
+  });
+
+  recipients.forEach((row) => {
+    if (!statuses.some((status) => status.recipientId === row.recipient_id)) {
+      statuses.push({
+        recipientId: row.recipient_id,
+        recipientName: formatProfileName(recipientProfileById.get(row.recipient_id)),
+        isDelivered: true,
+        isRead: row.is_read || false,
+        isXod: !!row.acknowledged_at,
+      });
+    }
+  });
+
+  return statuses;
+}
+
+type CardsContextValue = {
+  sentCards: Card[];
+  receivedCards: ReceivedCard[];
+  drafts: Card[];
+  loading: boolean;
+  sendCard: (card: Card) => Promise<void>;
+  markAsRead: (cardId: string) => Promise<void>;
+  togglePin: (cardId: string) => Promise<void>;
+  sendXo: (cardId: string) => Promise<void>;
+  deleteReceivedCard: (cardId: string) => Promise<void>;
+  deleteSentCard: (cardId: string) => Promise<void>;
+  saveDraft: (card: Card) => Promise<void>;
+  deleteDraft: (cardId: string) => Promise<void>;
+  refreshCards: () => Promise<void>;
+};
+
+const CardsContext = createContext<CardsContextValue | undefined>(undefined);
+
+export function CardsProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [sentCards, setSentCards] = useState<Card[]>([]);
   const [receivedCards, setReceivedCards] = useState<ReceivedCard[]>([]);
   const [drafts, setDrafts] = useState<Card[]>([]);
   const [loading, setLoading] = useState(true);
+  const loadCardsRef = useRef<() => Promise<void>>(async () => {});
 
   useEffect(() => {
     if (!user) {
@@ -68,15 +133,53 @@ export function useCards() {
     }
 
     setLoading(true);
-    loadCards();
-    
-    // Auto-refresh every 30 seconds to check for new cards
+    void loadCardsRef.current();
+
+    const pollMs = isDeviceAppVariant() ? 10000 : 30000;
     const interval = setInterval(() => {
-      loadCards();
-    }, 30000);
-    
-    return () => clearInterval(interval);
-  }, [user]);
+      void loadCardsRef.current();
+    }, pollMs);
+
+    const channel = supabase
+      .channel(`cards-sync-${user.id}-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'received_cards',
+          filter: `recipient_id=eq.${user.id}`,
+        },
+        (payload) => {
+          void loadCardsRef.current();
+
+          if (
+            isDeviceAppVariant() &&
+            payload.eventType === 'INSERT' &&
+            payload.new &&
+            typeof (payload.new as { card_id?: unknown }).card_id === 'string'
+          ) {
+            const cardId = (payload.new as { card_id: string }).card_id;
+            alertDeviceNewCard({ cardId }).catch((error) => {
+              console.warn('Card arrival alert failed:', error);
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    const appStateSubscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        void loadCardsRef.current();
+      }
+    });
+
+    return () => {
+      clearInterval(interval);
+      supabase.removeChannel(channel);
+      appStateSubscription.remove();
+    };
+  }, [user?.id]);
 
   function clearCards() {
     setSentCards([]);
@@ -111,6 +214,10 @@ export function useCards() {
       if (receivedCardsError) throw receivedCardsError;
 
       const receivedCardById = new Map((receivedCardData || []).map((card: any) => [card.id, card]));
+      const missingCardIds = receivedCardIds.filter((cardId: string) => !receivedCardById.has(cardId));
+      if (missingCardIds.length > 0) {
+        console.warn('Received card rows exist but card content is unavailable:', missingCardIds);
+      }
       const senderIds = Array.from(new Set((receivedCardData || []).map((card: any) => card.sender_id).filter(Boolean)));
       const { data: senderProfiles } = senderIds.length
         ? await supabase.from('user_profiles').select('id, email, first_name, last_name').in('id', senderIds)
@@ -192,12 +299,12 @@ export function useCards() {
         const finalRecipientIds = storedRecipientIds.length > 0
           ? storedRecipientIds
           : dbRecipientIds;
-        const deliveryStatuses: RecipientDeliveryStatus[] = recipients.map((rc: any) => ({
-          recipientId: rc.recipient_id,
-          recipientName: formatProfileName(recipientProfileById.get(rc.recipient_id)),
-          isRead: rc.is_read || false,
-          isXod: !!rc.acknowledged_at,
-        }));
+        const deliveryStatuses = buildDeliveryStatuses(
+          finalRecipientIds,
+          finalRecipientNames,
+          recipients,
+          recipientProfileById
+        );
 
         return {
           id: c.id,
@@ -261,6 +368,8 @@ export function useCards() {
       setLoading(false);
     }
   }
+
+  loadCardsRef.current = loadCards;
 
   async function claimInvitedCards(): Promise<void> {
     await claimInvitedCardsForSession();
@@ -375,7 +484,7 @@ export function useCards() {
           design_template: card.templateId,
           front_design_url: frontDesignUrl,
           message: card.personalMessage,
-          media_attachments: card.mediaAttachments,
+          media_attachments: sanitizeMediaAttachmentsForStorage(card.mediaAttachments),
           gift_details: card.gift,
           recipient_info: recipientInfo,
         })
@@ -560,7 +669,7 @@ export function useCards() {
             design_template: card.templateId,
             front_design_url: `template:${card.templateId}`,
             message: card.personalMessage,
-            media_attachments: card.mediaAttachments,
+            media_attachments: sanitizeMediaAttachmentsForStorage(card.mediaAttachments),
             gift_details: card.gift,
             recipient_info: {
               ids: card.recipientIds,
@@ -582,7 +691,7 @@ export function useCards() {
             design_template: card.templateId,
             front_design_url: `template:${card.templateId}`,
             message: card.personalMessage,
-            media_attachments: card.mediaAttachments,
+            media_attachments: sanitizeMediaAttachmentsForStorage(card.mediaAttachments),
             gift_details: card.gift,
             recipient_info: {
               ids: card.recipientIds,
@@ -635,7 +744,7 @@ export function useCards() {
     await loadCards();
   }
 
-  return {
+  const value: CardsContextValue = {
     sentCards,
     receivedCards,
     drafts,
@@ -650,4 +759,14 @@ export function useCards() {
     deleteDraft,
     refreshCards,
   };
+
+  return <CardsContext.Provider value={value}>{children}</CardsContext.Provider>;
+}
+
+export function useCards() {
+  const context = useContext(CardsContext);
+  if (!context) {
+    throw new Error('useCards must be used within a CardsProvider');
+  }
+  return context;
 }

@@ -16,7 +16,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 
-type AuthScreen = 'signIn' | 'signUp' | 'verify';
+type AuthScreen = 'signIn' | 'signUp' | 'verify' | 'forgotPassword';
 type AuthSearchParams = {
   screen?: string | string[];
   mode?: string | string[];
@@ -36,7 +36,7 @@ function getRequestedScreen(params: AuthSearchParams): AuthScreen {
 export default function LoginScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<AuthSearchParams>();
-  const { signIn, signUp, verifyOtp, resendOtp } = useAuth();
+  const { signIn, signUp, verifyOtp, resendOtp, requestPasswordReset } = useAuth();
   const requestedScreen = getRequestedScreen(params);
   const requestedEmail = getFirstParam(params.email) || '';
 
@@ -48,6 +48,7 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [resendLoading, setResendLoading] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
 
   useEffect(() => {
     if (requestedScreen === 'signUp') {
@@ -104,6 +105,25 @@ export default function LoginScreen() {
       else router.replace('/(tabs)');
     } catch (err: any) {
       setError(err.message || 'Verification failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    setError('');
+    setResetSent(false);
+    if (!email.trim()) {
+      setError('Enter your email address first');
+      return;
+    }
+    setLoading(true);
+    try {
+      const { error: resetError } = await requestPasswordReset(email.trim());
+      if (resetError) setError(resetError);
+      else setResetSent(true);
+    } catch (err: any) {
+      setError(err.message || 'Could not send reset email');
     } finally {
       setLoading(false);
     }
@@ -181,6 +201,50 @@ export default function LoginScreen() {
                   </Pressable>
                 </View>
               </>
+            ) : screen === 'forgotPassword' ? (
+              <>
+                <View style={styles.verifyHeader}>
+                  <View style={styles.verifyIconWrap}>
+                    <MaterialIcons name="lock-reset" size={28} color={theme.colors.primary} />
+                  </View>
+                  <Text style={styles.cardTitle}>Reset your password</Text>
+                  <Text style={styles.cardSubtitle}>
+                    Enter the email for your account and we&apos;ll send a reset link.
+                  </Text>
+                </View>
+
+                <Input
+                  name="email"
+                  label="Email"
+                  placeholder="you@example.com"
+                  value={email}
+                  onChangeText={setEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+
+                {error ? <ErrorBlock message={error} /> : null}
+                {resetSent ? (
+                  <ErrorBlock message="Reset link sent! Check your email." />
+                ) : null}
+
+                <Button
+                  title="Send Reset Link"
+                  onPress={handleForgotPassword}
+                  loading={loading}
+                  size="large"
+                  style={{ marginTop: 4 }}
+                />
+
+                <Pressable
+                  onPress={() => { setScreen('signIn'); setError(''); setResetSent(false); }}
+                  style={styles.switchRow}
+                >
+                  <Text style={styles.switchText}>
+                    Back to <Text style={styles.switchLink}>Sign In</Text>
+                  </Text>
+                </Pressable>
+              </>
             ) : (
               <>
                 <Text style={styles.cardTitle}>
@@ -192,6 +256,15 @@ export default function LoginScreen() {
                 )}
                 <Input name="email" label="Email" placeholder="you@example.com" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
                 <Input name="password" label="Password" placeholder="••••••••" value={password} onChangeText={setPassword} secureTextEntry />
+
+                {screen === 'signIn' ? (
+                  <Pressable
+                    onPress={() => { setScreen('forgotPassword'); setError(''); setResetSent(false); }}
+                    style={styles.forgotRow}
+                  >
+                    <Text style={styles.forgotLink}>Forgot Password?</Text>
+                  </Pressable>
+                ) : null}
 
                 {error ? <ErrorBlock message={error} /> : null}
 
@@ -356,6 +429,16 @@ const styles = StyleSheet.create({
   switchLink: {
     color: theme.colors.primary,
     fontWeight: '700',
+  },
+  forgotRow: {
+    alignSelf: 'flex-end',
+    marginTop: -4,
+    marginBottom: theme.spacing.sm,
+  },
+  forgotLink: {
+    fontSize: 13,
+    color: theme.colors.primary,
+    fontWeight: '600',
   },
   linkRow: {
     flexDirection: 'row',

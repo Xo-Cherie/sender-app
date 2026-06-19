@@ -36,6 +36,7 @@ export interface MediaAttachment {
   size: number; // in bytes
   duration?: number; // for videos/voice in seconds
   mimeType?: string;
+  pendingUpload?: boolean;
 }
 
 export type GiftPaymentStatus =
@@ -85,6 +86,7 @@ export interface StripeConnectStatus {
 export interface RecipientDeliveryStatus {
   recipientId: string;
   recipientName: string;
+  isDelivered: boolean;
   isRead: boolean;
   isXod: boolean;
 }

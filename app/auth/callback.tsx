@@ -13,9 +13,12 @@ export default function AuthCallbackScreen() {
 
     async function completeAuth() {
       try {
+        let isRecovery = false;
+
         if (Platform.OS === 'web' && typeof window !== 'undefined') {
           const url = new URL(window.location.href);
           const code = url.searchParams.get('code');
+          isRecovery = url.searchParams.get('type') === 'recovery';
 
           if (code) {
             const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
@@ -27,6 +30,9 @@ export default function AuthCallbackScreen() {
             const hashParams = new URLSearchParams(hash);
             const accessToken = hashParams.get('access_token');
             const refreshToken = hashParams.get('refresh_token');
+            if (hashParams.get('type') === 'recovery') {
+              isRecovery = true;
+            }
 
             if (accessToken && refreshToken) {
               const { error: sessionError } = await supabase.auth.setSession({
@@ -46,7 +52,11 @@ export default function AuthCallbackScreen() {
         }
 
         if (!cancelled) {
-          router.replace('/(tabs)');
+          if (isRecovery) {
+            router.replace('/reset-password' as '/login');
+          } else {
+            router.replace('/(tabs)');
+          }
         }
       } catch (err: any) {
         if (!cancelled) {

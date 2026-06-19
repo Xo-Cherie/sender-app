@@ -8,6 +8,8 @@ import { StatusBar } from 'expo-status-bar';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { useAuth } from '@/hooks/useAuth';
 import { useUnreadCount } from '@/hooks/useUnreadCount';
+import { PushNotificationProvider } from '@/components/PushNotificationProvider';
+import { DeviceNewCardBanner } from '@/components/DeviceNewCardBanner';
 import { theme } from '@/constants/theme';
 
 const NAV_ITEMS = [
@@ -140,6 +142,7 @@ function DeviceShell({ children }: { children: React.ReactNode }) {
       {isDesktop && <DeviceNav />}
       <View style={{ flex: 1 }}>
         {children}
+        <DeviceNewCardBanner />
       </View>
       {!isDesktop && <DeviceNav />}
     </View>
@@ -150,12 +153,14 @@ export default function DeviceLayout() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
+        <PushNotificationProvider>
           <StatusBar style="dark" />
           <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.cream }} edges={['top', 'bottom']}>
             <DeviceShell>
               <Stack screenOptions={{ headerShown: false }} />
             </DeviceShell>
           </SafeAreaView>
+        </PushNotificationProvider>
       </AuthProvider>
     </SafeAreaProvider>
   );

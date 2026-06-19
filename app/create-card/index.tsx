@@ -51,6 +51,7 @@ export default function CreateCardScreen() {
   const { sendCard } = useCards();
   const { user } = useAuth();
   const redirectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelledVoiceUploadsRef = useRef<Set<string>>(new Set());
   
   const [step, setStep] = useState<Step>('category');
   const [selectedCategory, setSelectedCategory] = useState<CardCategory | null>(null);
@@ -146,19 +147,51 @@ export default function CreateCardScreen() {
   };
 
   const handleAddVoiceMemo = async (memo: MediaAttachment) => {
-    if (!user) return;
+    if (!user) {
+      const message = 'Please sign in to attach voice memos.';
+      if (Platform.OS === 'web') {
+        alert(message);
+      } else {
+        Alert.alert('Sign In Required', message);
+      }
+      throw new Error(message);
+    }
+
+    setMediaAttachments(prev => [...prev, memo]);
 
     try {
       setUploadingVoice(true);
-      setUploadProgress('Uploading voice memo…');
-      const uploadedMemo = await uploadVoiceMemo(user.id, memo.uri, memo.duration, memo.mimeType);
-      setMediaAttachments(prev => [...prev, uploadedMemo]);
-    } catch (error: any) {
-      if (Platform.OS === 'web') {
-        alert(error?.message || 'Failed to upload voice memo');
-      } else {
-        Alert.alert('Upload Failed', error?.message || 'Failed to upload voice memo');
+      setUploadProgress('Saving voice memo…');
+      const uploadedMemo = await uploadVoiceMemo(
+        user.id,
+        memo.uri,
+        memo.duration,
+        memo.mimeType,
+        memo.id
+      );
+
+      if (cancelledVoiceUploadsRef.current.has(memo.id)) {
+        cancelledVoiceUploadsRef.current.delete(memo.id);
+        return;
       }
+
+      setMediaAttachments(prev =>
+        prev.map(item => (item.id === memo.id ? uploadedMemo : item))
+      );
+    } catch (error: any) {
+      if (cancelledVoiceUploadsRef.current.has(memo.id)) {
+        cancelledVoiceUploadsRef.current.delete(memo.id);
+        return;
+      }
+
+      setMediaAttachments(prev => prev.filter(item => item.id !== memo.id));
+      const message = error?.message || 'Failed to upload voice memo';
+      if (Platform.OS === 'web') {
+        alert(message);
+      } else {
+        Alert.alert('Upload Failed', message);
+      }
+      throw error;
     } finally {
       if (Platform.OS === 'web' && memo.uri.startsWith('blob:')) {
         URL.revokeObjectURL(memo.uri);
@@ -168,8 +201,29 @@ export default function CreateCardScreen() {
     }
   };
 
+  const handleRemoveVoiceMemo = (id: string) => {
+    cancelledVoiceUploadsRef.current.add(id);
+    setMediaAttachments(prev => {
+      const removed = prev.find(item => item.id === id);
+      if (Platform.OS === 'web' && removed?.uri.startsWith('blob:')) {
+        URL.revokeObjectURL(removed.uri);
+      }
+      return prev.filter(item => item.id !== id);
+    });
+  };
+
   const handleSend = async () => {
     if (!selectedTemplate_data || !user || sending) return;
+
+    if (uploadingVoice || mediaAttachments.some(item => item.pendingUpload)) {
+      const message = 'Please wait for voice memos to finish saving before sending.';
+      if (Platform.OS === 'web') {
+        alert(message);
+      } else {
+        Alert.alert('Voice Memo Saving', message);
+      }
+      return;
+    }
 
     setSending(true);
     try {
@@ -330,6 +384,10 @@ export default function CreateCardScreen() {
   };
 
   const canProceed = () => {
+    if (uploadingVoice || mediaAttachments.some(item => item.pendingUpload)) {
+      return false;
+    }
+
     switch (step) {
       case 'category':
         return selectedCategory !== null;
@@ -567,7 +625,7 @@ export default function CreateCardScreen() {
             <VoiceMemoRecorder
               memos={mediaAttachments}
               onAdd={handleAddVoiceMemo}
-              onRemove={(id) => setMediaAttachments(prev => prev.filter(m => m.id !== id))}
+              onRemove={handleRemoveVoiceMemo}
             />
             {uploadingVoice && (
               <View style={styles.voiceUploading}>

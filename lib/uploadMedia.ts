@@ -6,6 +6,12 @@ import type { MediaAttachment } from '@/types';
 
 const BUCKET = 'card-media';
 
+export function sanitizeMediaAttachmentsForStorage(
+  attachments: MediaAttachment[] = []
+): MediaAttachment[] {
+  return attachments.map(({ pendingUpload: _pendingUpload, ...attachment }) => attachment);
+}
+
 export async function requestMediaPermissions(): Promise<boolean> {
   if (Platform.OS === 'web') return true;
   const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -52,17 +58,29 @@ export async function uploadVoiceMemo(
   userId: string,
   uri: string,
   duration?: number,
-  mimeType?: string
+  mimeType?: string,
+  memoId?: string
 ): Promise<MediaAttachment> {
-  const publicUrl = await uploadFileToStorage(uri, 'voice', userId, mimeType);
+  const normalizedMimeType = normalizeContentType(mimeType, 'voice');
+  const publicUrl = await uploadFileToStorage(uri, 'voice', userId, normalizedMimeType);
 
   return {
-    id: `voice-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    id: memoId || `voice-${Date.now()}-${Math.random().toString(36).slice(2)}`,
     type: 'voice',
     uri: publicUrl,
     size: 0,
     duration,
+    mimeType: normalizedMimeType,
   };
+}
+
+function normalizeContentType(
+  mimeType: string | null | undefined,
+  type: 'photo' | 'video' | 'voice'
+): string {
+  const raw = mimeType?.split(';')[0]?.trim().toLowerCase();
+  if (raw) return raw;
+  return getFallbackContentType(type);
 }
 
 async function uploadFileToStorage(
@@ -71,7 +89,7 @@ async function uploadFileToStorage(
   userId: string,
   mimeType?: string | null
 ): Promise<string> {
-  const contentType = mimeType || getFallbackContentType(type);
+  const contentType = normalizeContentType(mimeType, type);
   const ext = getFileExtension(uri, contentType, type);
   const fileName = `${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 

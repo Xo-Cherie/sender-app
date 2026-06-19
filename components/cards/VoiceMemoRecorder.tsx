@@ -12,12 +12,20 @@ interface VoiceMemoRecorderProps {
   maxDuration?: number; // seconds, default 60
 }
 
-type RecordState = 'idle' | 'recording' | 'recorded';
+type RecordState = 'idle' | 'recording' | 'saving';
 
 function formatTime(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
+  const safeSeconds = Math.max(0, Math.round(seconds));
+  const m = Math.floor(safeSeconds / 60);
+  const s = safeSeconds % 60;
   return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+function getRecordedDurationSeconds(startedAt: number | null, elapsedSeconds: number): number {
+  if (startedAt) {
+    return Math.max(1, Math.round((Date.now() - startedAt) / 1000));
+  }
+  return Math.max(1, elapsedSeconds || 1);
 }
 
 export function VoiceMemoRecorder({
@@ -38,7 +46,9 @@ export function VoiceMemoRecorder({
   const webChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const soundRef = useRef<Audio.Sound | null>(null);
+  const webAudioRef = useRef<HTMLAudioElement | null>(null);
   const elapsedRef = useRef(0);
+  const recordingStartedAtRef = useRef<number | null>(null);
 
   useEffect(() => {
     return () => {
@@ -49,6 +59,10 @@ export function VoiceMemoRecorder({
       }
       if (soundRef.current) {
         soundRef.current.unloadAsync().catch(() => {});
+      }
+      if (webAudioRef.current) {
+        webAudioRef.current.pause();
+        webAudioRef.current = null;
       }
       if (webRecorderRef.current?.state === 'recording') {
         webRecorderRef.current.stop();
@@ -100,39 +114,49 @@ export function VoiceMemoRecorder({
 
   async function stopRecording() {
     if (Platform.OS === 'web') {
-      stopWebRecording();
+      await stopWebRecording();
       return;
     }
 
     if (!recordingRef.current) return;
 
     clearRecordingTimer();
+    setRecordState('saving');
 
     try {
-      await recordingRef.current.stopAndUnloadAsync();
-      const uri = recordingRef.current.getURI();
+      const recording = recordingRef.current;
+      const status = await recording.stopAndUnloadAsync();
+      const uri = recording.getURI() || status?.uri || null;
       recordingRef.current = null;
 
       await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
 
       if (uri) {
+        const duration = getRecordedDurationSeconds(
+          recordingStartedAtRef.current,
+          elapsedRef.current
+        );
         const memo: MediaAttachment = {
           id: `voice-${Date.now()}`,
           type: 'voice',
           uri,
           size: 0,
-          duration: elapsedRef.current,
+          duration,
           mimeType: 'audio/m4a',
+          pendingUpload: true,
         };
-        addMemo(memo);
+        await addMemo(memo);
+      } else {
+        showError('No audio was captured. Please try recording again.');
       }
-
+    } catch (err) {
+      console.error('Failed to stop recording:', err);
+      showError('Could not save this recording. Please try again.');
+    } finally {
+      recordingStartedAtRef.current = null;
       setRecordState('idle');
       setElapsed(0);
       elapsedRef.current = 0;
-    } catch (err) {
-      console.error('Failed to stop recording:', err);
-      setRecordState('idle');
     }
   }
 
@@ -140,6 +164,7 @@ export function VoiceMemoRecorder({
     setRecordState('recording');
     setElapsed(0);
     elapsedRef.current = 0;
+    recordingStartedAtRef.current = Date.now();
 
     timerRef.current = setInterval(() => {
       setElapsed(prev => {
@@ -147,7 +172,7 @@ export function VoiceMemoRecorder({
         elapsedRef.current = next;
 
         if (next >= maxDuration) {
-          stopRecording();
+          void stopRecording();
         }
 
         return next;
@@ -206,14 +231,17 @@ export function VoiceMemoRecorder({
       }
     };
 
-    recorder.onstop = () => {
+    recorder.onstop = async () => {
       clearRecordingTimer();
-      const blobType = recorder.mimeType || mimeType || 'audio/webm';
+      const blobType = normalizeWebMimeType(recorder.mimeType || mimeType || 'audio/webm');
       const blob = new Blob(webChunksRef.current, { type: blobType });
 
       if (blob.size === 0) {
         showError('No audio was recorded. Please try again and speak after the timer starts.');
         cleanupWebRecording();
+        webRecorderRef.current = null;
+        webChunksRef.current = [];
+        recordingStartedAtRef.current = null;
         setRecordState('idle');
         setElapsed(0);
         elapsedRef.current = 0;
@@ -221,23 +249,34 @@ export function VoiceMemoRecorder({
       }
 
       const uri = URL.createObjectURL(blob);
+      const duration = getRecordedDurationSeconds(
+        recordingStartedAtRef.current,
+        elapsedRef.current
+      );
 
       const memo: MediaAttachment = {
         id: `voice-${Date.now()}`,
         type: 'voice',
         uri,
         size: blob.size,
-        duration: elapsedRef.current,
+        duration,
         mimeType: blobType,
+        pendingUpload: true,
       };
 
       cleanupWebRecording();
       webRecorderRef.current = null;
       webChunksRef.current = [];
-      setRecordState('idle');
+      recordingStartedAtRef.current = null;
       setElapsed(0);
       elapsedRef.current = 0;
-      addMemo(memo);
+      setRecordState('saving');
+
+      try {
+        await addMemo(memo);
+      } finally {
+        setRecordState('idle');
+      }
     };
 
     recorder.onerror = () => {
@@ -254,7 +293,14 @@ export function VoiceMemoRecorder({
 
   function stopWebRecording() {
     if (!webRecorderRef.current || webRecorderRef.current.state !== 'recording') return;
+    if (typeof webRecorderRef.current.requestData === 'function') {
+      webRecorderRef.current.requestData();
+    }
     webRecorderRef.current.stop();
+  }
+
+  function normalizeWebMimeType(mimeType: string): string {
+    return mimeType.split(';')[0]?.trim().toLowerCase() || 'audio/webm';
   }
 
   function getSupportedWebAudioMimeType(): string | undefined {
@@ -271,11 +317,17 @@ export function VoiceMemoRecorder({
     return supportedTypes.find(type => MediaRecorder.isTypeSupported(type));
   }
 
-  function addMemo(memo: MediaAttachment) {
-    Promise.resolve(onAdd(memo)).catch((error) => {
+  async function addMemo(memo: MediaAttachment) {
+    try {
+      await onAdd(memo);
+    } catch (error) {
       console.error('Failed to save voice memo:', error);
+      if (Platform.OS === 'web' && memo.uri.startsWith('blob:')) {
+        URL.revokeObjectURL(memo.uri);
+      }
       Alert.alert('Error', 'Could not save this voice memo.');
-    });
+      throw error;
+    }
   }
 
   function cleanupWebRecording() {
@@ -290,16 +342,64 @@ export function VoiceMemoRecorder({
     }
   }
 
-  async function playMemo(memo: MediaAttachment) {
-    // Stop any existing sound
+  async function stopCurrentPlayback() {
     if (soundRef.current) {
       await soundRef.current.stopAsync().catch(() => {});
       await soundRef.current.unloadAsync().catch(() => {});
       soundRef.current = null;
     }
 
+    if (webAudioRef.current) {
+      webAudioRef.current.pause();
+      webAudioRef.current.currentTime = 0;
+      webAudioRef.current = null;
+    }
+  }
+
+  async function playMemo(memo: MediaAttachment) {
+    await stopCurrentPlayback();
+
     if (playingId === memo.id) {
       setPlayingId(null);
+      return;
+    }
+
+    if (Platform.OS === 'web') {
+      try {
+        const audio = new window.Audio(memo.uri);
+        audio.preload = 'auto';
+        audio.onloadedmetadata = () => {
+          setPlayPosition(prev => ({
+            ...prev,
+            [memo.id]: 0,
+          }));
+        };
+        audio.ontimeupdate = () => {
+          const pos = Number.isFinite(audio.currentTime)
+            ? Math.round(audio.currentTime)
+            : 0;
+          setPlayPosition(prev => ({ ...prev, [memo.id]: pos }));
+        };
+        audio.onended = () => {
+          setPlayingId(null);
+          webAudioRef.current = null;
+          setPlayPosition(prev => ({ ...prev, [memo.id]: 0 }));
+        };
+        audio.onerror = () => {
+          setPlayingId(null);
+          webAudioRef.current = null;
+          showError('Could not play this voice memo.');
+        };
+
+        webAudioRef.current = audio;
+        setPlayingId(memo.id);
+        await audio.play();
+      } catch (err) {
+        console.error('Failed to play memo:', err);
+        setPlayingId(null);
+        webAudioRef.current = null;
+        showError('Could not play this voice memo.');
+      }
       return;
     }
 
@@ -361,7 +461,10 @@ export function VoiceMemoRecorder({
                 </Pressable>
 
                 <View style={styles.memoInfo}>
-                  <Text style={styles.memoLabel}>Voice Memo {index + 1}</Text>
+                  <Text style={styles.memoLabel}>
+                    Voice Memo {index + 1}
+                    {memo.pendingUpload ? ' · Saving…' : ''}
+                  </Text>
                   <View style={styles.waveBarRow}>
                     {/* Waveform bars (decorative) */}
                     {Array.from({ length: 20 }).map((_, i) => {
@@ -389,11 +492,9 @@ export function VoiceMemoRecorder({
                 <Pressable
                   style={styles.removeBtn}
                   onPress={() => {
-                    if (playingId === memo.id) {
-                      soundRef.current?.stopAsync().catch(() => {});
-                      soundRef.current?.unloadAsync().catch(() => {});
-                      soundRef.current = null;
-                      setPlayingId(null);
+                    void stopCurrentPlayback();
+                    if (Platform.OS === 'web' && memo.uri.startsWith('blob:')) {
+                      URL.revokeObjectURL(memo.uri);
                     }
                     onRemove(memo.id);
                   }}
@@ -412,6 +513,12 @@ export function VoiceMemoRecorder({
           <View style={styles.recordDot} />
           <Text style={styles.recordButtonText}>Tap to record a voice memo</Text>
         </Pressable>
+      )}
+
+      {recordState === 'saving' && (
+        <View style={styles.savingBox}>
+          <Text style={styles.savingText}>Saving voice memo…</Text>
+        </View>
       )}
 
       {webError ? (
@@ -622,5 +729,18 @@ const styles = StyleSheet.create({
     color: theme.colors.mediumGray,
     textAlign: 'center',
     fontStyle: 'italic',
+  },
+  savingBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.white,
+    borderRadius: theme.borderRadius.md,
+    paddingVertical: theme.spacing.lg,
+    ...theme.shadows.card,
+  },
+  savingText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.colors.primary,
   },
 });

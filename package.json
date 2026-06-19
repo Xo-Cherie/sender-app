@@ -15,6 +15,7 @@
     "push:process-pending": "powershell -ExecutionPolicy Bypass -File ./scripts/push-process-pending.ps1",
     "push:deploy": "supabase functions deploy register-push-token && supabase functions deploy send-push-notification",
     "gifts:deploy": "supabase functions deploy create-gift-payment && supabase functions deploy verify-gift-payment && supabase functions deploy stripe-webhook && supabase functions deploy create-connect-onboarding && supabase functions deploy claim-gift-payout && supabase functions deploy link-gift-to-card",
+    "gifts:test": "powershell -ExecutionPolicy Bypass -File ./scripts/gifts-sandbox-test.ps1",
     "lint": "expo lint"
   },
   "dependencies": {

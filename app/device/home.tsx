@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   Text,
@@ -14,46 +14,17 @@ import { theme } from '@/constants/theme';
 import { useAuth } from '@/hooks/useAuth';
 import { useCards } from '@/hooks/useCards';
 import { normalizeCardFrontImage, getCardImageSource } from '@/lib/cardImages';
-import { supabase } from '@/lib/supabase';
-import { alertDeviceNewCard } from '@/lib/notifications';
 import { playDeviceCardArrivalSound } from '@/lib/deviceCardAlertSound';
 
 export default function DeviceHome() {
   const router = useRouter();
   const { user } = useAuth();
-  const { receivedCards, loading, refreshCards } = useCards();
+  const { receivedCards, loading } = useCards();
   const { width } = useWindowDimensions();
-  const refreshCardsRef = useRef(refreshCards);
-
-  useEffect(() => {
-    refreshCardsRef.current = refreshCards;
-  }, [refreshCards]);
 
   useEffect(() => {
     if (!user) router.replace('/device/login');
   }, [router, user]);
-
-  // Real-time new card subscription
-  useEffect(() => {
-    if (!user) return;
-    const channel = supabase
-      .channel(`device-home-${user.id}-${Date.now()}-${Math.random().toString(36).slice(2)}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'received_cards', filter: `recipient_id=eq.${user.id}` },
-        (payload) => {
-          refreshCardsRef.current();
-          const cardId = (payload.new as { card_id?: string })?.card_id;
-          if (cardId) {
-            alertDeviceNewCard({ cardId }).catch((error) => {
-              console.warn('Card arrival alert failed:', error);
-            });
-          }
-        }
-      )
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [user]);
 
   const unread = receivedCards.filter(c => !c.isRead);
   const recent = receivedCards.slice(0, 6);

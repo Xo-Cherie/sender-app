@@ -6,7 +6,35 @@ import { theme } from '@/constants/theme';
 import { Button } from '@/components/ui/Button';
 import { useCards } from '@/hooks/useCards';
 import { verifyGiftPayment } from '@/lib/gifts';
+import { getEdgeFunctionErrorMessage } from '@/lib/edgeFunctions';
 import { clearPendingCardSend, loadPendingCardSend } from '@/lib/pendingCardSend';
+
+function readParam(value: string | string[] | undefined): string | undefined {
+  if (Array.isArray(value)) return value[0];
+  return value;
+}
+
+async function verifyPaidGift(input: { giftId?: string; sessionId?: string }) {
+  const delays = [0, 1500, 3000];
+  let lastError = 'Payment was not completed.';
+
+  for (const delayMs of delays) {
+    if (delayMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+
+    const { data: verified, error: verifyError } = await verifyGiftPayment(input);
+    if (verified?.status === 'paid') {
+      return { verified, error: null as string | null };
+    }
+
+    lastError = verifyError
+      ? await getEdgeFunctionErrorMessage(verifyError, verifyError.message)
+      : `Payment was not completed (status: ${verified?.status || 'unknown'}).`;
+  }
+
+  return { verified: null, error: lastError };
+}
 
 export default function GiftPaymentScreen() {
   const router = useRouter();
@@ -25,9 +53,9 @@ export default function GiftPaymentScreen() {
     let mounted = true;
 
     async function finalizePayment() {
-      const giftId = typeof params.gift_id === 'string' ? params.gift_id : undefined;
-      const sessionId = typeof params.session_id === 'string' ? params.session_id : undefined;
-      const status = typeof params.status === 'string' ? params.status : undefined;
+      const giftId = readParam(params.gift_id);
+      const sessionId = readParam(params.session_id);
+      const status = readParam(params.status);
 
       if (status === 'canceled') {
         if (mounted) {
@@ -42,14 +70,11 @@ export default function GiftPaymentScreen() {
         return;
       }
 
-      const { data: verified, error: verifyError } = await verifyGiftPayment({ giftId, sessionId });
+      const { verified, error: verifyErrorMessage } = await verifyPaidGift({ giftId, sessionId });
       if (!mounted) return;
 
-      if (verifyError || verified?.status !== 'paid') {
-        setError(
-          verifyError?.message ||
-            `Payment was not completed (status: ${verified?.status || 'unknown'}).`
-        );
+      if (verifyErrorMessage || !verified) {
+        setError(verifyErrorMessage || 'Payment was not completed.');
         return;
       }
 
