@@ -117,5 +117,6 @@ export interface ReceivedCard extends Card {
   isPinned: boolean;
   isXod: boolean; // acknowledged with Xo
   xodAt?: string;
+  receivedAt?: string;
   recipientId: string;
 }

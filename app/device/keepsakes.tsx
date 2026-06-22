@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -13,7 +13,12 @@ import { theme } from '@/constants/theme';
 import { useAuth } from '@/hooks/useAuth';
 import { useCards } from '@/hooks/useCards';
 import { CardTimelineItem } from '@/components/cards/CardTimelineItem';
+import { OnThisDaySection } from '@/components/cards/OnThisDaySection';
 import { formatCardTimelineDate, getMessagePreview } from '@/lib/cardMessageUtils';
+import {
+  collectOnThisDayCardIds,
+  getOnThisDayMemoryGroups,
+} from '@/lib/keepsakeMemories';
 
 export default function DeviceKeepsakes() {
   const router = useRouter();
@@ -25,6 +30,13 @@ export default function DeviceKeepsakes() {
   }, [authLoading, router, user]);
 
   const keepsakes = receivedCards.filter(c => c.isPinned);
+
+  const onThisDayGroups = useMemo(() => getOnThisDayMemoryGroups(keepsakes), [keepsakes]);
+  const onThisDayIds = useMemo(() => collectOnThisDayCardIds(onThisDayGroups), [onThisDayGroups]);
+  const otherKeepsakes = useMemo(
+    () => keepsakes.filter((card) => !onThisDayIds.has(card.id)),
+    [keepsakes, onThisDayIds]
+  );
 
   if (!user) return null;
 
@@ -75,8 +87,15 @@ export default function DeviceKeepsakes() {
           </View>
         ) : (
           <>
+            <OnThisDaySection
+              groups={onThisDayGroups}
+              onCardPress={(id) => router.push({ pathname: '/device/card/[id]', params: { id } })}
+            />
+            {otherKeepsakes.length > 0 ? (
+              <Text style={styles.sectionHeading}>All keepsakes</Text>
+            ) : null}
             <View style={styles.timeline}>
-              {keepsakes.map(card => (
+              {otherKeepsakes.map(card => (
                 <CardTimelineItem
                   key={card.id}
                   dateLabel={formatCardTimelineDate(card.createdAt)}
@@ -130,6 +149,17 @@ const styles = StyleSheet.create({
   },
   tipText: { flex: 1, fontSize: 13, color: theme.colors.primaryDark, lineHeight: 18 },
   timelineWrap: { flexGrow: 1, padding: 24 },
+  sectionHeading: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: theme.colors.mediumGray,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    marginBottom: 12,
+    maxWidth: 720,
+    width: '100%',
+    alignSelf: 'center',
+  },
   timeline: { gap: 16, maxWidth: 720, width: '100%', alignSelf: 'center' },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 80 },
   empty: { alignItems: 'center', paddingVertical: 80, paddingHorizontal: 32, gap: 14 },

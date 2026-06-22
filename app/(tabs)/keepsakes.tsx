@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -7,7 +7,22 @@ import { theme } from '@/constants/theme';
 import { useCards } from '@/hooks/useCards';
 import { Input } from '@/components/ui/Input';
 import { CardTimelineItem } from '@/components/cards/CardTimelineItem';
+import { OnThisDaySection } from '@/components/cards/OnThisDaySection';
 import { formatCardTimelineDate, getMessagePreview } from '@/lib/cardMessageUtils';
+import {
+  collectOnThisDayCardIds,
+  getOnThisDayMemoryGroups,
+} from '@/lib/keepsakeMemories';
+import type { ReceivedCard } from '@/types';
+
+function matchesSearch(card: ReceivedCard, query: string) {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) return true;
+  return (
+    card.senderName.toLowerCase().includes(normalized) ||
+    card.personalMessage.toLowerCase().includes(normalized)
+  );
+}
 
 export default function KeepsakesScreen() {
   const router = useRouter();
@@ -16,10 +31,27 @@ export default function KeepsakesScreen() {
 
   const keepsakes = receivedCards.filter(card => card.isRead);
 
-  const filteredKeepsakes = keepsakes.filter(card =>
-    card.senderName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    card.personalMessage.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const onThisDayGroups = useMemo(() => getOnThisDayMemoryGroups(keepsakes), [keepsakes]);
+  const onThisDayIds = useMemo(() => collectOnThisDayCardIds(onThisDayGroups), [onThisDayGroups]);
+
+  const filteredOnThisDayGroups = useMemo(() => {
+    if (!searchQuery.trim()) return onThisDayGroups;
+    return onThisDayGroups
+      .map((group) => ({
+        ...group,
+        cards: group.cards.filter((card) => matchesSearch(card, searchQuery)),
+      }))
+      .filter((group) => group.cards.length > 0);
+  }, [onThisDayGroups, searchQuery]);
+
+  const filteredKeepsakes = keepsakes.filter((card) => {
+    if (!matchesSearch(card, searchQuery)) return false;
+    if (onThisDayIds.has(card.id)) return false;
+    return true;
+  });
+
+  const hasOnThisDay = filteredOnThisDayGroups.length > 0;
+  const showEmptySearch = keepsakes.length > 0 && !hasOnThisDay && filteredKeepsakes.length === 0;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -55,7 +87,7 @@ export default function KeepsakesScreen() {
               Cards you open become cherished keepsakes
             </Text>
           </View>
-        ) : filteredKeepsakes.length === 0 ? (
+        ) : showEmptySearch ? (
           <View style={styles.empty}>
             <View style={styles.emptyIcon}>
               <MaterialIcons name="search" size={28} color={theme.colors.primary} />
@@ -64,6 +96,13 @@ export default function KeepsakesScreen() {
           </View>
         ) : (
           <View style={styles.timeline}>
+            <OnThisDaySection
+              groups={filteredOnThisDayGroups}
+              onCardPress={(id) => router.push(`/card-detail?id=${id}`)}
+            />
+            {hasOnThisDay && filteredKeepsakes.length > 0 ? (
+              <Text style={styles.sectionHeading}>All memories</Text>
+            ) : null}
             {filteredKeepsakes.map(card => (
               <CardTimelineItem
                 key={card.id}
@@ -123,6 +162,14 @@ const styles = StyleSheet.create({
   timeline: {
     paddingHorizontal: theme.spacing.lg,
     gap: theme.spacing.md,
+  },
+  sectionHeading: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: theme.colors.mediumGray,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    marginTop: theme.spacing.xs,
   },
   empty: {
     alignItems: 'center',

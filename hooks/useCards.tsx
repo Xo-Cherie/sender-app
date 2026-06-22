@@ -245,6 +245,7 @@ export function CardsProvider({ children }: { children: ReactNode }) {
             mediaAttachments: card.media_attachments || [],
             gift: card.gift_details || undefined,
             createdAt: card.created_at,
+            receivedAt: rc.received_at || undefined,
             status: 'sent' as const,
             isRead: rc.is_read || false,
             isPinned: rc.is_pinned || false,
