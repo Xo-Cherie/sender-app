@@ -17,12 +17,12 @@ import { formatCardTimelineDate, getMessagePreview } from '@/lib/cardMessageUtil
 
 export default function DeviceKeepsakes() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { receivedCards, loading } = useCards();
 
   useEffect(() => {
-    if (!user) router.replace('/device/login');
-  }, [user, router]);
+    if (!user && !authLoading) router.replace('/device/login');
+  }, [authLoading, router, user]);
 
   const keepsakes = receivedCards.filter(c => c.isPinned);
 

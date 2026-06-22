@@ -18,13 +18,13 @@ import { playDeviceCardArrivalSound } from '@/lib/deviceCardAlertSound';
 
 export default function DeviceHome() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { receivedCards, loading } = useCards();
   const { width } = useWindowDimensions();
 
   useEffect(() => {
-    if (!user) router.replace('/device/login');
-  }, [router, user]);
+    if (!user && !authLoading) router.replace('/device/login');
+  }, [authLoading, router, user]);
 
   const unread = receivedCards.filter(c => !c.isRead);
   const recent = receivedCards.slice(0, 6);

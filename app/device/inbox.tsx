@@ -19,8 +19,8 @@ type Filter = 'all' | 'unread';
 
 export default function DeviceInbox() {
   const router = useRouter();
-  const { user, signOut } = useAuth();
-  const { receivedCards, loading, refreshCards } = useCards();
+  const { user, signOut, loading: authLoading } = useAuth();
+  const { receivedCards, loading: cardsLoading, refreshCards } = useCards();
   const [filter, setFilter] = useState<Filter>('all');
 
   const handleSignOut = async () => {
@@ -29,10 +29,10 @@ export default function DeviceInbox() {
   };
 
   useEffect(() => {
-    if (!user && !loading) {
+    if (!user && !authLoading) {
       router.replace('/device/login');
     }
-  }, [loading, router, user]);
+  }, [authLoading, router, user]);
 
   const filtered = receivedCards.filter(card => {
     if (filter === 'unread') return !card.isRead;
@@ -84,7 +84,7 @@ export default function DeviceInbox() {
       </View>
 
       <ScrollView contentContainerStyle={styles.timelineWrap} showsVerticalScrollIndicator={false}>
-        {loading ? (
+        {cardsLoading ? (
           <View style={styles.centered}>
             <ActivityIndicator size="large" color={theme.colors.primary} />
             <Text style={styles.loadingText}>Loading your cards…</Text>

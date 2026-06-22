@@ -14,19 +14,8 @@ import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { theme } from '@/constants/theme';
 import { useAuth } from '@/hooks/useAuth';
-import { requestPushPermissions, registerPushTokenForUser } from '@/lib/notifications';
-import { supabase } from '@/lib/supabase';
 
 type DeviceAuthMode = 'signIn' | 'signUp' | 'verify' | 'forgotPassword';
-
-async function completeDeviceSignIn() {
-  const { data } = await supabase.auth.getSession();
-  const userId = data.session?.user?.id;
-  if (!userId) return;
-
-  await requestPushPermissions();
-  await registerPushTokenForUser(userId);
-}
 
 export default function DeviceLogin() {
   const router = useRouter();
@@ -51,7 +40,6 @@ export default function DeviceLogin() {
       router.replace({ pathname: '/device/mfa-verify', params: { next: '/device/inbox' } });
       return;
     }
-    await completeDeviceSignIn();
     router.replace('/device/inbox');
   };
 
@@ -71,7 +59,6 @@ export default function DeviceLogin() {
     const { error: err } = await verifyOtp(email.trim(), otp.trim());
     setLoading(false);
     if (err) { setError(err); return; }
-    await completeDeviceSignIn();
     router.replace('/device/inbox');
   };
 

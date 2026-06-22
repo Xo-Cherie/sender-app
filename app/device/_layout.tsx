@@ -5,11 +5,8 @@ import { Stack, useRouter, usePathname } from 'expo-router';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
-import { AuthProvider } from '@/contexts/AuthContext';
 import { useAuth } from '@/hooks/useAuth';
 import { useUnreadCount } from '@/hooks/useUnreadCount';
-import { PushNotificationProvider } from '@/components/PushNotificationProvider';
-import { AuthRecoveryRedirect } from '@/components/AuthRecoveryRedirect';
 import { DeviceNewCardBanner } from '@/components/DeviceNewCardBanner';
 import { theme } from '@/constants/theme';
 
@@ -153,17 +150,12 @@ function DeviceShell({ children }: { children: React.ReactNode }) {
 export default function DeviceLayout() {
   return (
     <SafeAreaProvider>
-      <AuthProvider>
-        <AuthRecoveryRedirect />
-        <PushNotificationProvider>
-          <StatusBar style="dark" />
-          <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.cream }} edges={['top', 'bottom']}>
-            <DeviceShell>
-              <Stack screenOptions={{ headerShown: false }} />
-            </DeviceShell>
-          </SafeAreaView>
-        </PushNotificationProvider>
-      </AuthProvider>
+      <StatusBar style="dark" />
+      <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.cream }} edges={['top', 'bottom']}>
+        <DeviceShell>
+          <Stack screenOptions={{ headerShown: false }} />
+        </DeviceShell>
+      </SafeAreaView>
     </SafeAreaProvider>
   );
 }
