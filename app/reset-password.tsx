@@ -47,7 +47,8 @@ export default function ResetPasswordScreen() {
         return;
       }
       setSuccess(true);
-      setTimeout(() => router.replace('/login' as '/login'), 2000);
+      const loginPath = process.env.EXPO_PUBLIC_APP_VARIANT === 'device' ? '/device/login' : '/login';
+      setTimeout(() => router.replace(loginPath as '/login'), 2000);
     } finally {
       setLoading(false);
     }

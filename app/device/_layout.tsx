@@ -9,6 +9,7 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import { useAuth } from '@/hooks/useAuth';
 import { useUnreadCount } from '@/hooks/useUnreadCount';
 import { PushNotificationProvider } from '@/components/PushNotificationProvider';
+import { AuthRecoveryRedirect } from '@/components/AuthRecoveryRedirect';
 import { DeviceNewCardBanner } from '@/components/DeviceNewCardBanner';
 import { theme } from '@/constants/theme';
 
@@ -153,6 +154,7 @@ export default function DeviceLayout() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
+        <AuthRecoveryRedirect />
         <PushNotificationProvider>
           <StatusBar style="dark" />
           <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.cream }} edges={['top', 'bottom']}>

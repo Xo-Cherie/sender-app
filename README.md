@@ -37,11 +37,12 @@ npm run functions:serve
 
 In the Supabase dashboard, open **Authentication → URL Configuration** and add these redirect URLs:
 
-- `http://localhost:8081/auth/callback` (local web)
+- `http://localhost:8081/auth/callback` (local web — open the email link on the same computer)
 - `https://www.cheriecard.com/auth/callback` (production web)
-- `xocherie://auth/callback` (Android/iOS builds)
+- `xocherie://auth/callback` (main Android/iOS builds)
+- `cheriedevice://auth/callback` (device Android/iOS builds)
 
-Email confirmation links and magic links will land on `/auth/callback`, which completes sign-in and sends users to the app home screen.
+Password reset links land on `/auth/callback`, then open the **Reset Password** screen where the user sets a new password. Request a reset from the same platform you will use to open the email (web on desktop → open link in a browser; APK on phone → open link on that phone with the app installed).
 
 ### 3. Start the Project
 

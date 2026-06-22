@@ -3,12 +3,14 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { PushNotificationProvider } from '@/components/PushNotificationProvider';
+import { AuthRecoveryRedirect } from '@/components/AuthRecoveryRedirect';
 import { CardsProvider } from '@/hooks/useCards';
 
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
+        <AuthRecoveryRedirect />
         <PushNotificationProvider>
           <CardsProvider>
           <StatusBar style="dark" />

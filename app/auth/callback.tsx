@@ -1,8 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Platform } from 'react-native';
+import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
+import { establishSessionFromAuthUrl } from '@/lib/parseAuthCallbackUrl';
 import { theme } from '@/constants/theme';
+
+async function getIncomingAuthUrl(): Promise<string | null> {
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    return window.location.href;
+  }
+  return Linking.getInitialURL();
+}
 
 export default function AuthCallbackScreen() {
   const router = useRouter();
@@ -11,44 +20,30 @@ export default function AuthCallbackScreen() {
   useEffect(() => {
     let cancelled = false;
 
-    async function completeAuth() {
+    async function completeAuth(incomingUrl: string | null) {
       try {
+        if (!incomingUrl) {
+          throw new Error('Sign-in link expired or is invalid. Request a new link and try again.');
+        }
+
         let isRecovery = false;
+        const hasAuthPayload =
+          incomingUrl.includes('code=') ||
+          incomingUrl.includes('access_token=') ||
+          incomingUrl.includes('error=');
+
+        if (hasAuthPayload) {
+          const result = await establishSessionFromAuthUrl(incomingUrl);
+          isRecovery = result.isRecovery;
+        }
 
         if (Platform.OS === 'web' && typeof window !== 'undefined') {
-          const url = new URL(window.location.href);
-          const code = url.searchParams.get('code');
-          isRecovery = url.searchParams.get('type') === 'recovery';
-
-          if (code) {
-            const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
-            if (exchangeError) throw exchangeError;
-          } else {
-            const hash = window.location.hash.startsWith('#')
-              ? window.location.hash.slice(1)
-              : window.location.hash;
-            const hashParams = new URLSearchParams(hash);
-            const accessToken = hashParams.get('access_token');
-            const refreshToken = hashParams.get('refresh_token');
-            if (hashParams.get('type') === 'recovery') {
-              isRecovery = true;
-            }
-
-            if (accessToken && refreshToken) {
-              const { error: sessionError } = await supabase.auth.setSession({
-                access_token: accessToken,
-                refresh_token: refreshToken,
-              });
-              if (sessionError) throw sessionError;
-            }
-          }
-
           window.history.replaceState({}, document.title, '/auth/callback');
         }
 
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) {
-          throw new Error('Sign-in link expired or is invalid. Request a new code and try again.');
+          throw new Error('Sign-in link expired or is invalid. Request a new link and try again.');
         }
 
         if (!cancelled) {
@@ -66,10 +61,17 @@ export default function AuthCallbackScreen() {
       }
     }
 
-    completeAuth();
+    getIncomingAuthUrl().then((url) => {
+      if (!cancelled) completeAuth(url);
+    });
+
+    const linkingSub = Linking.addEventListener('url', ({ url }) => {
+      if (!cancelled) completeAuth(url);
+    });
 
     return () => {
       cancelled = true;
+      linkingSub.remove();
     };
   }, [router]);
 
