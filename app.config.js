@@ -40,6 +40,13 @@ module.exports = {
       package: IS_DEVICE_VARIANT
         ? 'com.xocherie.device'
         : 'com.xocherie.app',
+      intentFilters: [
+        {
+          action: 'VIEW',
+          data: [{ scheme: IS_DEVICE_VARIANT ? 'cheriedevice' : 'xocherie' }],
+          category: ['BROWSABLE', 'DEFAULT'],
+        },
+      ],
     },
     web: {
       bundler: 'metro',

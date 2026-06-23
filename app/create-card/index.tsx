@@ -32,8 +32,8 @@ import {
   dollarsToCents,
   isStripeConfigured,
   openStripeCheckout,
+  parseStripeReturnParams,
   validateGiftAmount,
-  verifyGiftPayment,
 } from '@/lib/gifts';
 import { getEdgeFunctionErrorMessage } from '@/lib/edgeFunctions';
 import { savePendingCardSend } from '@/lib/pendingCardSend';
@@ -331,22 +331,20 @@ export default function CreateCardScreen() {
           throw new Error('Gift payment was canceled.');
         }
 
-        const { data: verified, error: verifyError } = await verifyGiftPayment({
-          giftId: paymentData.giftId,
+        const returnParams =
+          'url' in browserResult && typeof browserResult.url === 'string'
+            ? parseStripeReturnParams(browserResult.url)
+            : {};
+
+        router.replace({
+          pathname: '/gift-payment',
+          params: {
+            status: returnParams.status || 'success',
+            gift_id: paymentData.giftId,
+            ...(returnParams.session_id ? { session_id: returnParams.session_id } : {}),
+          },
         });
-
-        if (verifyError || verified?.status !== 'paid') {
-          throw new Error(
-            verifyError?.message ||
-              `Gift payment was not completed (status: ${verified?.status || 'unknown'}).`
-          );
-        }
-
-        resolvedGift = {
-          ...gift,
-          giftId: paymentData.giftId,
-          paymentStatus: 'paid',
-        };
+        return;
       }
 
       const card: Card = {

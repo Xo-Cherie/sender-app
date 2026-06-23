@@ -4,7 +4,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { theme } from '@/constants/theme';
-import { Button } from '@/components/ui/Button';
 import { useGifts } from '@/hooks/useGifts';
 import { centsToDollars, getGiftStatusLabel, isStripeLiveMode } from '@/lib/gifts';
 import type { GiftPaymentStatus } from '@/types';

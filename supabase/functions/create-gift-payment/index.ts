@@ -1,10 +1,10 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
 import {
   corsHeaders,
-  getAppUrl,
   getStripeSecretKey,
   jsonResponse,
   mapCheckoutPaymentStatus,
+  resolveGiftPaymentRedirectPath,
   stripeRequest,
 } from '../_shared/stripe.ts';
 
@@ -14,6 +14,7 @@ type CreateGiftPaymentPayload = {
   recipientId?: string;
   recipientEmail?: string;
   giftMessage?: string;
+  redirectPath?: string;
 };
 
 function normalizeEmail(email?: string) {
@@ -134,8 +135,8 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: `${message}${hint}` }, 500);
   }
 
-  const appUrl = getAppUrl();
   const giftId = giftRow.id as string;
+  const giftPaymentPath = resolveGiftPaymentRedirectPath(payload.redirectPath);
 
   try {
     const session = await stripeRequest<{
@@ -145,8 +146,8 @@ Deno.serve(async (req) => {
     }>('/checkout/sessions', {
       body: {
         mode: 'payment',
-        success_url: `${appUrl}/gift-payment?status=success&session_id={CHECKOUT_SESSION_ID}&gift_id=${giftId}`,
-        cancel_url: `${appUrl}/gift-payment?status=canceled&gift_id=${giftId}`,
+        success_url: `${giftPaymentPath}?status=success&session_id={CHECKOUT_SESSION_ID}&gift_id=${giftId}`,
+        cancel_url: `${giftPaymentPath}?status=canceled&gift_id=${giftId}`,
         client_reference_id: giftId,
         metadata: {
           gift_id: giftId,

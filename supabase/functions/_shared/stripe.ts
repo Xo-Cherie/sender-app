@@ -45,6 +45,34 @@ export function getAppUrl(): string {
   ).replace(/\/$/, '');
 }
 
+/** Validate client-supplied Stripe return path (web origin or native deep link). */
+export function resolveGiftPaymentRedirectPath(requested?: string): string {
+  const fallback = `${getAppUrl()}/gift-payment`;
+
+  if (!requested || typeof requested !== 'string') {
+    return fallback;
+  }
+
+  const trimmed = requested.trim();
+  if (!trimmed) return fallback;
+
+  const allowed = [
+    /^https:\/\/(www\.)?cheriecard\.com\/gift-payment\/?$/i,
+    /^http:\/\/localhost(:\d+)?\/gift-payment\/?$/i,
+    /^http:\/\/127\.0\.0\.1(:\d+)?\/gift-payment\/?$/i,
+    /^xocherie:\/\/gift-payment\/?$/i,
+    /^xocherie:\/\/\/gift-payment\/?$/i,
+    /^cheriedevice:\/\/gift-payment\/?$/i,
+    /^cheriedevice:\/\/\/gift-payment\/?$/i,
+  ];
+
+  if (allowed.some((pattern) => pattern.test(trimmed))) {
+    return trimmed.replace(/\/$/, '');
+  }
+
+  return fallback;
+}
+
 export async function stripeRequest<T>(
   path: string,
   options: {

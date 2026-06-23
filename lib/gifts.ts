@@ -1,4 +1,5 @@
 import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
 import { Platform } from 'react-native';
 import { invokeEdgeFunction } from '@/lib/edgeFunctions';
 import type { CardGiftTransaction, GiftPaymentStatus, StripeConnectStatus } from '@/types';
@@ -62,12 +63,36 @@ function getAppReturnUrl(path: string): string {
     return `${window.location.origin}${path}`;
   }
 
+  // Native checkout must return to the app deep link, not the public website.
+  if (path.startsWith('/gift-payment')) {
+    const params = new URLSearchParams(path.includes('?') ? path.split('?')[1] : '');
+    const record: Record<string, string> = {};
+    params.forEach((value, key) => {
+      record[key] = value;
+    });
+    return buildGiftPaymentReturnUrl(record);
+  }
+
   const configured = process.env.EXPO_PUBLIC_APP_URL?.replace(/\/$/, '');
   if (configured) {
     return `${configured}${path}`;
   }
 
   return `http://localhost:8081${path}`;
+}
+
+/** Stripe return path after checkout — web URL or native deep link (xocherie://gift-payment). */
+export function getGiftPaymentRedirectPath(): string {
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    return `${window.location.origin.replace(/\/$/, '')}/gift-payment`;
+  }
+  return Linking.createURL('gift-payment');
+}
+
+function buildGiftPaymentReturnUrl(params: Record<string, string>): string {
+  const path = getGiftPaymentRedirectPath();
+  const query = new URLSearchParams(params).toString();
+  return query ? `${path}?${query}` : path;
 }
 
 export async function createGiftPayment(input: {
@@ -84,7 +109,12 @@ export async function createGiftPayment(input: {
     status: GiftPaymentStatus;
     livemode: boolean;
     error?: string;
-  }>('create-gift-payment', { body: input });
+  }>('create-gift-payment', {
+    body: {
+      ...input,
+      redirectPath: getGiftPaymentRedirectPath(),
+    },
+  });
 }
 
 export async function verifyGiftPayment(input: { giftId?: string; sessionId?: string }) {
@@ -132,6 +162,20 @@ export async function startConnectOnboarding() {
     detailsSubmitted: boolean;
     error?: string;
   }>('create-connect-onboarding', { body: {} });
+}
+
+export function parseStripeReturnParams(url: string): Record<string, string> {
+  const normalized = url.replace(/^([a-z][a-z0-9+.-]*):\/\//i, 'https://auth.local/');
+  try {
+    const parsed = new URL(normalized);
+    const params: Record<string, string> = {};
+    parsed.searchParams.forEach((value, key) => {
+      params[key] = value;
+    });
+    return params;
+  } catch {
+    return {};
+  }
 }
 
 export async function openStripeCheckout(checkoutUrl: string, giftId: string) {
