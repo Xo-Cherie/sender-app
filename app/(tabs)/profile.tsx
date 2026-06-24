@@ -22,6 +22,7 @@ import { theme } from '@/constants/theme';
 import { useAuth } from '@/hooks/useAuth';
 import type { MfaEnrollment } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { invokeEdgeFunction, getEdgeFunctionErrorMessage } from '@/lib/edgeFunctions';
 import { Button } from '@/components/ui/Button';
 
 type PrivacySettings = {
@@ -59,6 +60,7 @@ export default function ProfileScreen() {
   const [mfaSetup, setMfaSetup] = useState<MfaEnrollment | null>(null);
   const [mfaCode, setMfaCode] = useState('');
   const [privacy, setPrivacy] = useState<PrivacySettings>(DEFAULT_PRIVACY);
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -101,6 +103,44 @@ export default function ProfileScreen() {
   const handleLogout = async () => {
     await signOut();
     router.replace('/login');
+  };
+
+  const handleDeleteAccount = () => {
+    const confirmDelete = async () => {
+      setDeletingAccount(true);
+      try {
+        const { error } = await invokeEdgeFunction('delete-account');
+        if (error) {
+          const message = await getEdgeFunctionErrorMessage(error, 'Could not delete account');
+          showMessage('Delete failed', message);
+          return;
+        }
+
+        await signOut();
+        router.replace('/login');
+        showMessage('Account deleted', 'Your account and profile data have been removed.');
+      } catch (error: any) {
+        showMessage('Delete failed', error?.message || 'Could not delete account');
+      } finally {
+        setDeletingAccount(false);
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm('Delete your account permanently? This cannot be undone.')) {
+        confirmDelete();
+      }
+      return;
+    }
+
+    Alert.alert(
+      'Delete Account',
+      'This permanently deletes your account, profile, and saved preferences. Cards you already sent may remain with recipients. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: confirmDelete },
+      ]
+    );
   };
 
   if (!user) return null;
@@ -508,11 +548,13 @@ export default function ProfileScreen() {
             variant="outline"
             style={styles.logoutButton}
           />
-        </View>
-
-        <View style={styles.mockBadge}>
-          <MaterialIcons name="info-outline" size={16} color={theme.colors.primary} />
-          <Text style={styles.mockText}>V1.0 Demo Mode</Text>
+          <Button
+            title={deletingAccount ? 'Deleting...' : 'Delete Account'}
+            onPress={handleDeleteAccount}
+            variant="outline"
+            disabled={deletingAccount}
+            style={styles.deleteAccountButton}
+          />
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -893,24 +935,13 @@ const styles = StyleSheet.create({
     color: theme.colors.dark,
     marginLeft: theme.spacing.md,
   },
-  mockBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: theme.spacing.xs,
-    marginTop: theme.spacing.lg,
-    padding: theme.spacing.sm,
-  },
-  mockText: {
-    fontSize: 12,
-    color: theme.colors.primary,
-    fontWeight: '600',
-  },
   logoutSection: {
     marginHorizontal: theme.spacing.lg,
     marginTop: theme.spacing.lg,
+    gap: theme.spacing.sm,
   },
-  logoutButton: {
+  logoutButton: {},
+  deleteAccountButton: {
     borderColor: theme.colors.error,
   },
 });

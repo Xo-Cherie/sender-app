@@ -359,14 +359,6 @@ export default function CardDetailScreen() {
     : ['Recipient'];
   const displayRecipientName = displayRecipientNames[0];
 
-  console.log('🎨 RENDERING FLIPCARD WITH:');
-  console.log('  frontImage:', displayFrontImage);
-  console.log('  backMessage:', displayMessage);
-  console.log('  recipientName:', displayRecipientName);
-  console.log('  senderName:', displaySenderName);
-  console.log('  size: large');
-
-
   const handleXo = async () => {
     if (!card || !card.id || isSentView) return;
     const receivedCard = card as ReceivedCard;

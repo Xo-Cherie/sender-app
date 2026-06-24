@@ -1,0 +1,21 @@
+# Regenerate native projects on EAS from app.config.js + profile env vars.
+# The checked-in android/ folder is for the Cherie Device variant only.
+android/
+
+# Local-only / not needed on the build server
+.git/
+.cursor/
+agent-transcripts/
+docs/
+supabase/.branches/
+supabase/functions/.env.local
+.expo/
+dist/
+web-build/
+
+# Reduce upload size
+**/*.md
+!README.md
+**/*.map
+**/.DS_Store
+**/Thumbs.db

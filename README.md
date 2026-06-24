@@ -57,11 +57,14 @@ npm run web           # Start the web version
 
 ### 4. Build Android / iOS (EAS)
 
-EAS cloud builds use the Supabase variables in `eas.json`. Rebuild after changing them:
+EAS cloud builds use the Supabase variables in `eas.json`. Rebuild after changing them.
+
+See the full release checklist: [docs/production-handoff.md](./docs/production-handoff.md)
 
 ```bash
-npx eas-cli build --platform android --profile preview
-npx eas-cli build --platform ios --profile preview
+npm run build:android:preview      # QA APK for client testing
+npm run build:android:production   # Play Store build
+npm run build:ios:production       # App Store build
 npx eas-cli build --platform android --profile preview-device
 ```
 

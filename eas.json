@@ -18,6 +18,7 @@
       "android": {
         "buildType": "apk"
       },
+      "prebuildCommand": "npx expo prebuild --platform android --clean",
       "env": {
         "EXPO_PUBLIC_APP_URL": "https://www.cheriecard.com",
         "EXPO_PUBLIC_SUPABASE_URL": "https://kaxmrthocgmpfbsbvpge.supabase.co",
@@ -29,6 +30,7 @@
       "android": {
         "buildType": "apk"
       },
+      "prebuildCommand": "npx expo prebuild --platform android --clean",
       "env": {
         "EXPO_PUBLIC_APP_VARIANT": "device",
         "EXPO_PUBLIC_APP_URL": "https://www.cheriecard.com",
@@ -38,6 +40,7 @@
     },
     "production": {
       "autoIncrement": true,
+      "prebuildCommand": "npx expo prebuild --clean",
       "env": {
         "EXPO_PUBLIC_APP_URL": "https://www.cheriecard.com",
         "EXPO_PUBLIC_SUPABASE_URL": "https://kaxmrthocgmpfbsbvpge.supabase.co",
@@ -46,6 +49,7 @@
     },
     "production-device": {
       "autoIncrement": true,
+      "prebuildCommand": "npx expo prebuild --clean",
       "env": {
         "EXPO_PUBLIC_APP_VARIANT": "device",
         "EXPO_PUBLIC_APP_URL": "https://www.cheriecard.com",

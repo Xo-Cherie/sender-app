@@ -16,6 +16,12 @@
     "push:deploy": "supabase functions deploy register-push-token && supabase functions deploy send-push-notification",
     "gifts:deploy": "supabase functions deploy create-gift-payment && supabase functions deploy verify-gift-payment && supabase functions deploy stripe-webhook && supabase functions deploy create-connect-onboarding && supabase functions deploy claim-gift-payout && supabase functions deploy link-gift-to-card",
     "gifts:test": "powershell -ExecutionPolicy Bypass -File ./scripts/gifts-sandbox-test.ps1",
+    "account:deploy": "supabase functions deploy delete-account",
+    "build:android:preview": "npx eas-cli build --platform android --profile preview",
+    "build:android:production": "npx eas-cli build --platform android --profile production",
+    "build:ios:production": "npx eas-cli build --platform ios --profile production",
+    "submit:android": "npx eas-cli submit --platform android --profile production --latest",
+    "submit:ios": "npx eas-cli submit --platform ios --profile production --latest",
     "lint": "expo lint"
   },
   "dependencies": {

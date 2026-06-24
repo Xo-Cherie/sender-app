@@ -29,7 +29,7 @@ export default function KeepsakesScreen() {
   const { receivedCards } = useCards();
   const [searchQuery, setSearchQuery] = useState('');
 
-  const keepsakes = receivedCards.filter(card => card.isRead);
+  const keepsakes = receivedCards.filter(card => card.isPinned);
 
   const onThisDayGroups = useMemo(() => getOnThisDayMemoryGroups(keepsakes), [keepsakes]);
   const onThisDayIds = useMemo(() => collectOnThisDayCardIds(onThisDayGroups), [onThisDayGroups]);
@@ -84,7 +84,7 @@ export default function KeepsakesScreen() {
             </View>
             <Text style={styles.emptyTitle}>No keepsakes yet</Text>
             <Text style={styles.emptySubtext}>
-              Cards you open become cherished keepsakes
+              Open a card and tap Save to Keepsakes to save it here
             </Text>
           </View>
         ) : showEmptySearch ? (

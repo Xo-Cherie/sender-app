@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Pressable, StyleSheet, Text, Dimensions } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -30,6 +31,13 @@ const sizes = {
   large: { width: screenWidth * 0.85, height: screenWidth * 1.1 },
 };
 
+function formatMediaTime(seconds?: number): string {
+  const value = Math.max(0, Math.round(seconds || 0));
+  const minutes = Math.floor(value / 60);
+  const remainingSeconds = value % 60;
+  return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+}
+
 export function FlipCard({
   frontImage,
   backMessage,
@@ -46,14 +54,18 @@ export function FlipCard({
   const { width, height } = sizes[size];
   const photos = mediaAttachments.filter((attachment) => attachment.type === 'photo');
   const primaryPhoto = photos[0];
-  const hasMedia = photos.length > 0;
+  const voiceMemos = mediaAttachments.filter((attachment) => attachment.type === 'voice');
+  const hasVoiceMemos = voiceMemos.length > 0;
+  const hasMedia = photos.length > 0 || hasVoiceMemos;
   const isCompactBack = size !== 'large' || hasMedia;
   const photoWidth = Math.min(width * (isCompactBack ? 0.72 : 0.82), width - theme.spacing.lg * 2);
   const photoHeight = Math.min(
     photoWidth / 1.15,
-    height * 0.36
+    height * (hasVoiceMemos ? 0.28 : 0.36)
   );
   const messageLineLimit = hasMedia ? (primaryPhoto ? 4 : 6) : 8;
+  const voiceLabel = voiceMemos.length === 1 ? 'Voice memo' : `${voiceMemos.length} voice memos`;
+  const voiceDuration = voiceMemos.length === 1 ? voiceMemos[0].duration : undefined;
 
 
 
@@ -126,7 +138,23 @@ export function FlipCard({
                     <Text style={styles.photoCountText}>+{photos.length - 1}</Text>
                   </View>
                 ) : null}
+                {hasVoiceMemos ? (
+                  <View style={styles.voiceBadge}>
+                    <MaterialIcons name="mic" size={13} color={theme.colors.white} />
+                    <Text style={styles.voiceBadgeText}>
+                      {voiceLabel}{voiceDuration ? ` • ${formatMediaTime(voiceDuration)}` : ''}
+                    </Text>
+                  </View>
+                ) : null}
               </Pressable>
+            ) : null}
+            {!primaryPhoto && hasVoiceMemos ? (
+              <View style={styles.voicePreview}>
+                <MaterialIcons name="mic" size={16} color={theme.colors.primary} />
+                <Text style={styles.voicePreviewText}>
+                  {voiceLabel}{voiceDuration ? ` • ${formatMediaTime(voiceDuration)}` : ''}
+                </Text>
+              </View>
             ) : null}
           </View>
           {senderName && (
@@ -225,6 +253,43 @@ const styles = StyleSheet.create({
   },
   photoCountText: {
     color: theme.colors.white,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  voiceBadge: {
+    position: 'absolute',
+    left: 8,
+    right: 8,
+    bottom: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(193,123,102,0.92)',
+    borderRadius: theme.borderRadius.full,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+  },
+  voiceBadgeText: {
+    color: theme.colors.white,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  voicePreview: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    alignSelf: 'center',
+    backgroundColor: theme.colors.white,
+    borderRadius: theme.borderRadius.full,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.primaryLight,
+  },
+  voicePreviewText: {
+    color: theme.colors.primary,
     fontSize: 12,
     fontWeight: '700',
   },
